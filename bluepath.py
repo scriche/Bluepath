@@ -3,7 +3,7 @@ from pathlib import Path
 import pydbus
 from gi.repository import GLib
 
-log_file = Path('./Desktop/bluepath.log')
+log_file = Path('./bluepath.log')
 
 # Clear the log file at the start of the program
 log_file.open('w').close()

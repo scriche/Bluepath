@@ -4,16 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log Viewer</title>
+    <script>
+        function toggleBluetoothDevices() {
+            const showBluetooth = document.getElementById('showBluetooth').checked;
+            const logSections = document.querySelectorAll('.log-section');
+
+            logSections.forEach(section => {
+                const logs = section.querySelectorAll('li');
+                let hasBluetoothLog = false;
+
+                logs.forEach(log => {
+                    if (log.textContent.includes('Bluetooth')) {
+                        hasBluetoothLog = true;
+                        log.style.display = showBluetooth ? 'list-item' : 'none';
+                    }
+                });
+
+                section.style.display = hasBluetoothLog ? 'block' : 'none';
+            });
+        }
+    </script>
 </head>
 <body>
     <h1>Log Viewer</h1>
+    <label>
+        <input type="checkbox" id="showBluetooth" onclick="toggleBluetoothDevices()">
+        Show only Bluetooth devices with a name
+    </label>
     {% for ip, logs in log_data.items() %}
-        <h2>Logs from {{ ip }}</h2>
-        <ul>
-            {% for log in logs %}
-                <li>{{ log }}</li>
-            {% endfor %}
-        </ul>
+        <div class="log-section">
+            <h2>Logs from {{ ip }}</h2>
+            <ul>
+                {% for log in logs %}
+                    <li>{{ log }}</li>
+                {% endfor %}
+            </ul>
+        </div>
     {% endfor %}
 </body>
 </html>

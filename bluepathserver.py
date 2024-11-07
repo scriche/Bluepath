@@ -2,6 +2,7 @@ import socket
 import threading
 from flask import Flask, render_template, request
 from collections import defaultdict
+import requests
 
 app = Flask(__name__)
 log_data = defaultdict(list)
