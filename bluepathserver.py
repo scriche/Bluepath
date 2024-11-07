@@ -29,7 +29,6 @@ def udp_server(server_ip, server_port):
         data, addr = sock.recvfrom(2048)
         log = data.decode()
         ip = addr[0]
-        print(f"Received log from {ip}: {log}")
         requests.post('http://127.0.0.1:8080/logs', json={'ip': ip, 'log': log})
 
 if __name__ == "__main__":

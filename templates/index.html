@@ -7,20 +7,13 @@
     <script>
         function toggleBluetoothDevices() {
             const showBluetooth = document.getElementById('showBluetooth').checked;
-            const logSections = document.querySelectorAll('.log-section');
+            const rows = document.querySelectorAll('.log-row');
 
-            logSections.forEach(section => {
-                const logs = section.querySelectorAll('li');
-                let hasBluetoothLog = false;
-
-                logs.forEach(log => {
-                    if (log.textContent.includes('Bluetooth')) {
-                        hasBluetoothLog = true;
-                        log.style.display = showBluetooth ? 'list-item' : 'none';
-                    }
-                });
-
-                section.style.display = hasBluetoothLog ? 'block' : 'none';
+            rows.forEach(row => {
+                const log = row.querySelector('.log-data').textContent;
+                if (log.includes('Bluetooth')) {
+                    row.style.display = showBluetooth ? 'table-row' : 'none';
+                }
             });
         }
     </script>
@@ -31,15 +24,39 @@
         <input type="checkbox" id="showBluetooth" onclick="toggleBluetoothDevices()">
         Show only Bluetooth devices with a name
     </label>
-    {% for ip, logs in log_data.items() %}
-        <div class="log-section">
-            <h2>Logs from {{ ip }}</h2>
-            <ul>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>IP Address</th>
+                <th>Time</th>
+                <th>Device Name</th>
+                <th>MAC Address</th>
+                <th>Signal Strength</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ip, logs in log_data.items() %}
                 {% for log in logs %}
-                    <li>{{ log }}</li>
+                    {% for device in log.split('\n') %}
+                        {% if device %}
+                            {% set parts = device.split(': ') %}
+                            {% set time = parts[1].split(']')[0] %}
+                            {% set device_info = parts[2].split(' @ ') %}
+                            {% set device_name = device_info[0] %}
+                            {% set mac_address = device_info[1].split(' ')[0] %}
+                            {% set signal_strength = device_info[1].split(' ')[2] %}
+                            <tr class="log-row">
+                                <td>{{ ip }}</td>
+                                <td>{{ time }}</td>
+                                <td class="log-data">{{ device_name }}</td>
+                                <td>{{ mac_address }}</td>
+                                <td>{{ signal_strength }}</td>
+                            </tr>
+                        {% endif %}
+                    {% endfor %}
                 {% endfor %}
-            </ul>
-        </div>
-    {% endfor %}
+            {% endfor %}
+        </tbody>
+    </table>
 </body>
 </html>
