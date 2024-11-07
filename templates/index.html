@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Viewer</title>
+</head>
+<body>
+    <h1>Log Viewer</h1>
+    {% for ip, logs in log_data.items() %}
+        <h2>Logs from {{ ip }}</h2>
+        <ul>
+            {% for log in logs %}
+                <li>{{ log }}</li>
+            {% endfor %}
+        </ul>
+    {% endfor %}
+</body>
+</html>
