@@ -16,7 +16,7 @@ def receive_log():
     data = request.get_json()
     ip = data['ip']
     log = data['log']
-    log_data[ip].append(log)
+    log_data[ip] = [log]  # Replace old data with new data
     return 'Log received', 200
 
 def udp_server(server_ip, server_port):
