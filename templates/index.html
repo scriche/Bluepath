@@ -37,23 +37,13 @@
         <tbody>
             {% for ip, logs in log_data.items() %}
                 {% for log in logs %}
-                    {% for device in log.split('\n') %}
-                        {% if device %}
-                            {% set parts = device.split(': ') %}
-                            {% set time = parts[1].split(']')[0] %}
-                            {% set device_info = parts[2].split(' @ ') %}
-                            {% set device_name = device_info[0] %}
-                            {% set mac_address = device_info[1].split(' ')[0] %}
-                            {% set signal_strength = device_info[1].split(' ')[2] %}
-                            <tr class="log-row">
-                                <td>{{ ip }}</td>
-                                <td>{{ time }}</td>
-                                <td class="log-data">{{ device_name }}</td>
-                                <td>{{ mac_address }}</td>
-                                <td>{{ signal_strength }}</td>
-                            </tr>
-                        {% endif %}
-                    {% endfor %}
+                    <tr>
+                        <td>{{ ip }}</td>
+                        <td>{{ log[0] }}</td>
+                        <td>{{ log[1] }}</td>
+                        <td>{{ log[2] }}</td>
+                        <td>{{ log[3] }}</td>
+                    </tr>
                 {% endfor %}
             {% endfor %}
         </tbody>
