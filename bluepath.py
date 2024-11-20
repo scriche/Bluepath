@@ -82,14 +82,6 @@ mngr.onInterfacesAdded = new_iface
 adapter = bus.get('org.bluez', '/org/bluez/hci0')
 adapter.DuplicateData = False
 
-# Iterate around already known devices and add to monitor
-print('Adding already known device to monitor...')
-mng_objs = mngr.GetManagedObjects()
-for path in mng_objs:
-    device = mng_objs[path].get('org.bluez.Device1', {}).get('Address', [])
-    if device:
-        DeviceMonitor(path)
-
 # Run discovery indefinitely
 adapter.StartDiscovery()
 print('Finding nearby devices...')
