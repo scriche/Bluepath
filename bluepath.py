@@ -13,7 +13,7 @@ def write_to_log(address, rssi, name):
     now = datetime.now()
     current_time = now.strftime('%H:%M:%S')
     with log_file.open('a') as dev_log:
-        dev_log.write(f'Device seen[{current_time}]: {name} ({address}) @ {rssi} dBm\n')
+        dev_log.write(f'{current_time},{name},{address},{rssi}\n')
 
 def remove_from_log(address):
     """Remove device entry from the log file"""
