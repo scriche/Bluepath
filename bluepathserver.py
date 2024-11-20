@@ -24,8 +24,10 @@ def receive_log():
     # Add each IP log to the list and split each MAC address with a new line then again
     # split each value for each MAC address with a comma
     # overwriting the log_data entry for the IP
-    log_data[ip] = log.split('\n')
+    # split the log by new line except the last one
+    log_data[ip] = log.split('\n')[:-1]
     for i in range(len(log_data[ip])):
+        # dont add empty strings
         log_data[ip][i] = log_data[ip][i].split(',')
     
     return 'Log received', 200
