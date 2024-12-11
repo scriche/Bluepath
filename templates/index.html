@@ -4,18 +4,142 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log Viewer</title>
-    <script>
-        function toggleBluetoothDevices() {
-            const showBluetooth = document.getElementById('showBluetooth').checked;
-            const rows = document.querySelectorAll('.log-row');
-
-            rows.forEach(row => {
-                const log = row.querySelector('.log-data').textContent;
-                if (log.includes('Bluetooth')) {
-                    row.style.display = showBluetooth ? 'table-row' : 'none';
-                }
-            });
+    <style>
+        .black-outline-box {
+            border: 3px solid black;
+            width: 600px;
+            height: 600px;
+            box-sizing: border-box;
+            position: relative;
+            padding: 0;
         }
+        .draggable {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            cursor: grab;
+        }
+        .node-label {
+            position: absolute;
+            font-size: 12px;
+            text-align: center;
+            transform: translateX(-50%);
+        }
+    </style>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const container = document.querySelector(".black-outline-box");
+            const nodePositions = [];
+            const processedIPs = new Set();
+
+            function updateNodes() {
+                // Clear existing nodes
+                container.innerHTML = '';
+
+                // Fetch node positions from the server
+                fetch("http://localhost:8080/get_nodespos")
+                    .then(response => response.json())
+                    .then(data => {
+                        data.nodes.forEach((node, index) => {
+                            const { ip, x, y } = node;
+
+                            // Mark the IP as processed
+                            processedIPs.add(ip);
+
+                            // Create image element
+                            const img = document.createElement("img");
+                            img.src = "static/node.png";
+                            img.alt = `Node ${ip}`;
+                            img.classList.add("draggable");
+                            img.style.left = `${x}px`;
+                            img.style.top = `${y}px`;
+
+                            // Disable default drag behavior
+                            img.addEventListener("dragstart", (e) => e.preventDefault());
+
+                            // Make image draggable
+                            img.addEventListener("mousedown", (e) => {
+                                const boxRect = container.getBoundingClientRect();
+                                const offsetX = e.clientX - img.getBoundingClientRect().left;
+                                const offsetY = e.clientY - img.getBoundingClientRect().top;
+
+                                const onMouseMove = (moveEvent) => {
+                                    let x = moveEvent.clientX - boxRect.left - offsetX;
+                                    let y = moveEvent.clientY - boxRect.top - offsetY;
+
+                                    // Restrict movement to the container
+                                    x = Math.max(0, Math.min(container.offsetWidth - img.offsetWidth, x));
+                                    y = Math.max(0, Math.min(container.offsetHeight - img.offsetHeight, y));
+
+                                    img.style.left = `${x}px`;
+                                    img.style.top = `${y}px`;
+                                };
+
+                                const onMouseUp = () => {
+                                    document.removeEventListener("mousemove", onMouseMove);
+                                    document.removeEventListener("mouseup", onMouseUp);
+
+                                    // Save the updated position
+                                    const x = parseInt(img.style.left);
+                                    const y = parseInt(img.style.top);
+                                    nodePositions[index] = { ip, x, y };
+
+                                    // Send updated positions to the server
+                                    fetch("http://localhost:8080/update_nodespos", {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify(nodePositions),
+                                    }).catch(err => console.error("Error updating positions:", err));
+                                };
+
+                                document.addEventListener("mousemove", onMouseMove);
+                                document.addEventListener("mouseup", onMouseUp);
+                            });
+
+                            // Create label element
+                            const label = document.createElement("div");
+                            label.textContent = ip;
+                            label.classList.add("node-label");
+                            label.style.left = img.style.left;
+                            label.style.top = `${parseInt(img.style.top) + 25}px`;
+
+                            // Append image and label to the container
+                            container.appendChild(img);
+                            container.appendChild(label);
+                        });
+                    })
+                    .catch(err => console.error("Error fetching node positions:", err));
+            }
+
+            // Initial update
+            updateNodes();
+
+            // Listen for table update event
+            document.querySelector("#log-table").addEventListener("update", updateNodes);
+
+            // Make updateNodes globally accessible
+            window.updateNodes = updateNodes;
+        });
+    </script>
+    <script>
+        function refreshContent() {
+            fetch(window.location.href)
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    // Refresh table
+                    const newTableBody = doc.querySelector('#log-table tbody');
+                    document.querySelector('#log-table tbody').innerHTML = newTableBody.innerHTML;
+
+                    // Update nodes
+                    updateNodes();
+                })
+                .catch(error => console.error('Error refreshing content:', error));
+        }
+
+        setInterval(refreshContent, 3000); // Refresh every 3 seconds
     </script>
 </head>
 <body>
@@ -24,7 +148,7 @@
         <input type="checkbox" id="showBluetooth" onclick="toggleBluetoothDevices()">
         Show only Bluetooth devices with a name
     </label>
-    <table border="1">
+    <table id="log-table" border="1">
         <thead>
             <tr>
                 <th>IP Address</th>
@@ -37,16 +161,18 @@
         <tbody>
             {% for ip, logs in log_data.items() %}
                 {% for log in logs %}
-                    <tr>
+                    <tr class="log-row">
                         <td>{{ ip }}</td>
                         <td>{{ log[0] }}</td>
-                        <td>{{ log[1] }}</td>
+                        <td class="device-name">{{ log[1] }}</td>
                         <td>{{ log[2] }}</td>
                         <td>{{ log[3] }}</td>
+                        <td class="log-data" style="display:none">{{ log[4] }}</td>
                     </tr>
                 {% endfor %}
             {% endfor %}
         </tbody>
     </table>
+    <div id="black-outline-box" class="black-outline-box"></div>
 </body>
 </html>
