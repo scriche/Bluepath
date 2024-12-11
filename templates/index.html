@@ -19,6 +19,11 @@
             height: 20px;
             cursor: grab;
         }
+        .device {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+        }
         .node-label {
             position: absolute;
             font-size: 12px;
@@ -40,7 +45,7 @@
                 fetch("http://localhost:8080/get_nodespos")
                     .then(response => response.json())
                     .then(data => {
-                        data.nodes.forEach((node, index) => {
+                        data.nodes.forEach((node) => {
                             const { ip, x, y } = node;
 
                             // Mark the IP as processed
@@ -82,7 +87,14 @@
                                     // Save the updated position
                                     const x = parseInt(img.style.left);
                                     const y = parseInt(img.style.top);
-                                    nodePositions[index] = { ip, x, y };
+
+                                    // Find the index of the node in the nodePositions array
+                                    const nodeIndex = nodePositions.findIndex(n => n.ip === ip);
+                                    if (nodeIndex !== -1) {
+                                        nodePositions[nodeIndex] = { ip, x, y };
+                                    } else {
+                                        nodePositions.push({ ip, x, y });
+                                    }
 
                                     // Send updated positions to the server
                                     fetch("http://localhost:8080/update_nodespos", {
@@ -135,11 +147,61 @@
 
                     // Update nodes
                     updateNodes();
+
+                    // Update devices
+                    updateDevices();
                 })
                 .catch(error => console.error('Error refreshing content:', error));
         }
 
         setInterval(refreshContent, 3000); // Refresh every 3 seconds
+    </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const container = document.querySelector(".black-outline-box");
+
+            function updateDevices() {
+                // Clear existing devices
+                container.innerHTML = '';
+
+                // Fetch address coordinates from the server
+                fetch("http://localhost:8080/get_address_coordinates")
+                    .then(response => response.json())
+                    .then(data => {
+                        data.address_coordinates.forEach((device) => {
+                            const { address, x, y } = device;
+
+                            // Create image element
+                            const img = document.createElement("img");
+                            img.src = "static/device.png";
+                            img.alt = `Device ${address}`;
+                            img.classList.add("device");
+                            img.style.left = `${x}px`;
+                            img.style.top = `${y}px`;
+                            img.style.position = "absolute"; // Ensure the image is positioned absolutely
+
+                            // Create label element
+                            const label = document.createElement("div");
+                            label.textContent = address;
+                            label.classList.add("node-label");
+                            label.style.left = img.style.left;
+                            label.style.top = `${parseInt(img.style.top) + 25}px`;
+                            label.style.position = "absolute"; // Ensure the label is positioned absolutely
+
+                            // Append image and label to the container
+                            container.appendChild(img);
+                            container.appendChild(label);
+                        });
+                    })
+                    .catch(err => console.error("Error fetching address coordinates:", err));
+            }
+
+            // Initial update
+            updateDevices();
+
+            // Make updateDevices globally accessible
+            window.updateDevices = updateDevices;
+        });
     </script>
 </head>
 <body>
