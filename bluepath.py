@@ -1,7 +1,9 @@
-from datetime import datetime
-from pathlib import Path
+import asyncio
 import pydbus
 from gi.repository import GLib
+from pathlib import Path
+from datetime import datetime
+import threading
 
 log_file = Path('./bluepath.log')
 
@@ -25,70 +27,61 @@ def remove_from_log(address):
                 if address not in line:
                     dev_log.write(line)
 
-bus = pydbus.SystemBus()
-mainloop = GLib.MainLoop()
-
-class DeviceMonitor:
-    """Class to represent remote bluetooth devices discovered"""
-    devices = {}
-
-    def __init__(self, path_obj):
-        self.device = bus.get('org.bluez', path_obj)
-        self.device.onPropertiesChanged = self.prop_changed
-        device_properties = self.device.GetAll('org.bluez.Device1')
+def update_devices(devices):
+    """Scan devices dictionary for devices and update the log file with the 
+    new RSSI values and remove devices that are out of range"""
+    log_file.open('w').close()
+    for addr, device in devices.items():
+        device_properties = device.GetAll('org.bluez.Device1')
         rssi = device_properties.get('RSSI')
         name = device_properties.get('Name', 'Unknown')
         if rssi:
-            print(f'Device added to monitor {name} ({self.device.Address}) @ {rssi} dBm')
-            DeviceMonitor.devices[self.device.Address] = self.device
-            write_to_log(self.device.Address, rssi, name)
+            write_to_log(addr, rssi, name)
         else:
-            print(f'Device added to monitor {name} ({self.device.Address})')
-            write_to_log(self.device.Address, 'N/A', name)
+            del devices[addr]
+            print(f'Device out of range {name} ({addr})')
+bus = pydbus.SystemBus()
+mainloop = GLib.MainLoop()
+devices = {}
 
-    def prop_changed(self, iface, props_changed, props_removed):
-        """method to be called when a property value on a device changes"""
-        rssi = props_changed.get('RSSI', None)
-        try:
-            name = self.device.Get('org.bluez.Device1', 'Name')
-        except GLib.GError:
-            name = 'Unknown'
-        if rssi is not None:
-            print(f'\tDevice Seen: {name} ({self.device.Address}) @ {rssi} dBm')
-            DeviceMonitor.devices[self.device.Address] = self.device
-            write_to_log(self.device.Address, rssi, name)
-        else:
-            if self.device.Address in DeviceMonitor.devices:
-                del DeviceMonitor.devices[self.device.Address]
-                print(f'\tDevice {name} ({self.device.Address}) is out of range')
-                remove_from_log(self.device.Address)
-
-def end_discovery():
-    """method called at the end of discovery scan"""
-    mainloop.quit()
-    adapter.StopDiscovery()
+def discovery(path_obj):
+    device = bus.get('org.bluez', path_obj)
+    try:
+        device_properties = device.GetAll('org.bluez.Device1')
+    except Exception as e:
+        print(f'Error getting device properties')
+        return
+    rssi = device_properties.get('RSSI')
+    name = device_properties.get('Name', 'Unknown')
+    if rssi:
+        print(f'Device added to monitor {name} ({device.Address}) @ {rssi} dBm')
+        # Add device to devices dictionary
+        devices[device.Address] = device
 
 def new_iface(path, iface_props):
-    """If a new dbus interfaces is a device, add it to be  monitored"""
     device_addr = iface_props.get('org.bluez.Device1', {}).get('Address')
     if device_addr:
-        DeviceMonitor(path)
+        discovery(path)
 
-# BlueZ object manager
+def start_updater():
+    threading.Timer(3.0, start_updater).start()
+    update_devices(devices)
+    
+# Bluez object manager
 mngr = bus.get('org.bluez', '/')
 mngr.onInterfacesAdded = new_iface
 
-# Connect to the DBus api for the Bluetooth adapter
 adapter = bus.get('org.bluez', '/org/bluez/hci0')
 adapter.DuplicateData = False
 
-# Run discovery indefinitely
 adapter.StartDiscovery()
-print('Finding nearby devices...')
+print('Finding devices...')
+
 try:
+    start_updater()
     mainloop.run()
 except KeyboardInterrupt:
+    # Stop discovery and exit the program
     adapter.StopDiscovery()
-
-# Start the main loop to run indefinitely
-mainloop.run()
+    mainloop.quit()
+    print('Exiting...')
