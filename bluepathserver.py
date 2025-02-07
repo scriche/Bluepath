@@ -1,20 +1,88 @@
 import socket
 import threading
-from flask import Flask, render_template, request, jsonify
+import json
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from flask_socketio import SocketIO, emit
 from collections import defaultdict
 import requests
 import numpy as np
 from flask_cors import CORS
 
 app = Flask(__name__)
+app.secret_key = 'your_secret_key'
 CORS(app)
+socketio = SocketIO(app)
 log_data = defaultdict(list)
 address_coordinates = {}
 nodepos = []
+unauthorized_macs = set()
+restrictedzones = []
+users = {}
+
+# Load users from JSON file
+def load_users():
+    global users
+    try:
+        with open('users.json', 'r') as f:
+            users = json.load(f)
+    except FileNotFoundError:
+        pass
+
+# Load unauthorized MAC addresses and restricted zones from JSON files
+def load_persistent_data():
+    global unauthorized_macs, restrictedzones
+    try:
+        with open('unauthorized.json', 'r') as f:
+            unauthorized_macs = set(json.load(f))
+    except FileNotFoundError:
+        pass
+    try:
+        with open('restricted.json', 'r') as f:
+            restrictedzones = json.load(f)
+    except FileNotFoundError:
+        pass
+
+# Save unauthorized MAC addresses to JSON file
+def save_unauthorized_macs():
+    with open('unauthorized.json', 'w') as f:
+        json.dump(list(unauthorized_macs), f)
+
+# Save restricted zones to JSON file
+def save_restrictedzones():
+    with open('restricted.json', 'w') as f:
+        json.dump(restrictedzones, f)
+
+load_users()
+load_persistent_data()
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        data = request.get_json()
+        username = data['username']
+        password = data['password']
+        if username in users and users[username] == password:
+            session['username'] = username
+            return jsonify({'success': True})
+        return jsonify({'success': False})
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    return redirect(url_for('login'))
 
 @app.route('/')
 def index():
-    return render_template('index.html', log_data=log_data, address_coordinates=address_coordinates)
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    return render_template('index.html', log_data=log_data, address_coordinates=address_coordinates, unauthorized_macs=unauthorized_macs)
+
+@app.route('/device_history')
+def device_history():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    return render_template('device_history.html', address_coordinates=address_coordinates, unauthorized_macs=unauthorized_macs)
 
 @app.route('/update_nodespos', methods=['POST'])
 def update_nodespos():
@@ -22,6 +90,7 @@ def update_nodespos():
     nodepos.clear()
     for node in data:
         nodepos.append((node['ip'], node['x'], node['y']))
+    socketio.emit('update_nodes', {'nodes': nodepos}, broadcast=True)
     return 'Node positions updated', 200
 
 @app.route('/get_nodespos', methods=['GET'])
@@ -33,7 +102,7 @@ def get_nodespos():
 
 @app.route('/get_address_coordinates', methods=['GET'])
 def get_address_coordinates():
-    return jsonify({'address_coordinates': [{'address': address, 'x': x, 'y': y} for address, (x, y) in address_coordinates.items()]}), 200
+    return jsonify({'address_coordinates': [{'address': address, 'x': x, 'y': y, 'name': name} for address, (x, y, name) in address_coordinates.items()]}), 200
 
 @app.route('/logs', methods=['POST'])
 def receive_log():
@@ -48,8 +117,69 @@ def receive_log():
     for i in range(len(log_data[ip])):
         log_data[ip][i] = log_data[ip][i].split(',')
     calulate_position()
+    restricted_devices = find_devices_in_restricted_zones()
     
+    socketio.emit('update_logs', {'log_data': log_data, 'address_coordinates': address_coordinates, 'restricted_devices': restricted_devices})
     return 'Log received', 200
+
+@app.route('/unauthorized_macs', methods=['POST'])
+def add_unauthorized_mac():
+    data = request.get_json()
+    mac = data['mac']
+    unauthorized_macs.add(mac)
+    save_unauthorized_macs()
+    return 'Unauthorized MAC address added', 200
+
+@app.route('/unauthorized_macs', methods=['GET'])
+def get_unauthorized_macs():
+    return jsonify({'unauthorized_macs': list(unauthorized_macs)}), 200
+
+@app.route('/unauthorized_macs', methods=['DELETE'])
+def delete_unauthorized_mac():
+    data = request.get_json()
+    mac = data['mac']
+    if mac in unauthorized_macs:
+        unauthorized_macs.remove(mac)
+        save_unauthorized_macs()
+        return 'Unauthorized MAC address deleted', 200
+    return 'MAC address not found', 404
+
+@app.route('/restrictedzones', methods=['POST'])
+def add_restrictedzone():
+    data = request.get_json()
+    restrictedzone = data['restrictedzone']
+    restrictedzones.append(restrictedzone)
+    save_restrictedzones()
+    return 'Restricted zone added', 200
+
+@app.route('/restrictedzones/toggle', methods=['POST'])
+def toggle_restrictedzone():
+    data = request.get_json()
+    x = data['x']
+    y = data['y']
+    restrictedzone = {'x': x, 'y': y}
+    if restrictedzone in restrictedzones:
+        restrictedzones.remove(restrictedzone)
+        message = 'Restricted zone removed'
+    else:
+        restrictedzones.append(restrictedzone)
+        message = 'Restricted zone added'
+    save_restrictedzones()
+    return message, 200
+
+@app.route('/restrictedzones', methods=['GET'])
+def get_restrictedzones():
+    return jsonify({'restrictedzones': restrictedzones, 'restricted_devices': find_devices_in_restricted_zones()}), 200
+
+@app.route('/restrictedzones', methods=['DELETE'])
+def delete_restrictedzone():
+    data = request.get_json()
+    restrictedzone = data['restrictedzone']
+    if restrictedzone in restrictedzones:
+        restrictedzones.remove(restrictedzone)
+        save_restrictedzones()
+        return 'Restricted zone deleted', 200
+    return 'Restricted zone not found', 404
 
 def trilaterate(node_a, r1, node_b, r2, node_c, r3):
     # Calculate the coordinates of the address using trilateration
@@ -81,19 +211,50 @@ def trilaterate(node_a, r1, node_b, r2, node_c, r3):
 
 def calulate_position():
     address_distance_from_node = {}
+    address_names = {}  # Dictionary to store names associated with addresses
     for ip, logs in log_data.items():
         for log in logs:
-            address, rssi = log[2], log[3]
+            address, rssi, name = log[2], log[3], log[1]
             if address not in address_distance_from_node:
                 address_distance_from_node[address] = []
             address_distance_from_node[address].append((float(rssi)*-0.2 - 10))
+            address_names[address] = name  # Store the name associated with the address
     for address, distances in address_distance_from_node.items():
-        if len(distances) == 3:
+        if len(distances) == 3 and len(nodepos) >= 3:
             node_a = nodepos[0]
             node_b = nodepos[1]
             node_c = nodepos[2]
             r1, r2, r3 = distances
-            address_coordinates[address] = trilaterate(node_a, r1, node_b, r2, node_c, r3)
+            try:
+                x, y = trilaterate(node_a, r1, node_b, r2, node_c, r3)
+                name = address_names.get(address, address)  # Get the name or fallback to address
+                address_coordinates[address] = (x, y, name)
+            except ValueError as e:
+                print(f"Error calculating position for address {address}: {e}")
+
+def find_devices_in_restricted_zones():
+    restricted_devices = []
+    for address, (x, y, name) in address_coordinates.items():
+        if address in unauthorized_macs:
+            for zone in restrictedzones:
+                if zone['x'] < x + 20 and x < zone['x'] + 25 and zone['y'] < y + 20 and y < zone['y'] + 25:
+                    restricted_devices.append(address)
+                    break
+    print(restricted_devices)
+    return restricted_devices
+
+@socketio.on('node_moved')
+def handle_node_moved(data):
+    nodepos.clear()
+    for node in data['nodes']:
+        nodepos.append((node['ip'], node['x'], node['y']))
+    calulate_position()
+    restricted_devices = find_devices_in_restricted_zones()
+    try:
+        socketio.emit('update_nodes', {'nodes': nodepos}, broadcast=True)
+        socketio.emit('update_logs', {'log_data': log_data, 'address_coordinates': address_coordinates, 'restricted_devices': restricted_devices}, broadcast=True)
+    except TypeError as e:
+        print(f"Error emitting socket event: {e}")
 
 def udp_server(server_ip, server_port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -104,12 +265,11 @@ def udp_server(server_ip, server_port):
     while True:
         data, addr = sock.recvfrom(2048)
         log = data.decode().split('|')[0]
-        #ip = addr[0]
         ip = data.decode().split('|')[1]
         requests.post('http://127.0.0.1:8080/logs', json={'ip': ip, 'log': log})
 
 if __name__ == "__main__":
     server_ip = '0.0.0.0'
-    server_port = int(input("Enter the server port: "))
+    server_port = int(input("Enter the logging port: "))
     threading.Thread(target=udp_server, args=(server_ip, server_port)).start()
-    app.run(host='0.0.0.0', port=8080)
+    socketio.run(app, host='0.0.0.0', port=8080)

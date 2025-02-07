@@ -3,238 +3,701 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Log Viewer</title>
+    <title>Bluepath</title>
+    <!-- Import Materialize CSS and JS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
     <style>
-        .black-outline-box {
-            border: 3px solid black;
+        body {
+            background-color: #121212;
+            color: #ffffff;
+        }
+        .gridmap {
+            border: 3px solid #ffffff;
             width: 600px;
             height: 600px;
             box-sizing: border-box;
             position: relative;
             padding: 0;
+            background-image: 
+                linear-gradient(to right, #ffffff 1px, transparent 1px), 
+                linear-gradient(to bottom, #ffffff 1px, transparent 1px),
+                linear-gradient(to right, #424242 1px, transparent 1px),
+                linear-gradient(to bottom, #424242 1px, transparent 1px);
+            background-size: 100px 100px, 100px 100px, 25px 25px, 25px 25px;
         }
         .draggable {
             position: absolute;
             width: 20px;
             height: 20px;
             cursor: grab;
+            z-index: 10;
         }
         .device {
             position: absolute;
             width: 20px;
             height: 20px;
+            z-index: 5;
         }
         .node-label {
             position: absolute;
             font-size: 12px;
             text-align: center;
             transform: translateX(-50%);
+            z-index: 15;
+        }
+        .tabs .tab a {
+            color: #ffffff;
+        }
+        .tabs .tab a:hover, .tabs .tab a.active {
+            background-color: #424242;
+        }
+        .sidebar {
+            padding: 20px;
+            background-color: #1e1e1e;
+            border-left: 3px solid #ffffff;
+            height: 600px;
+            overflow-y: auto;
+        }
+        .sidebar h5 {
+            color: #ffffff;
+        }
+        .sidebar ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        .sidebar ul li {
+            padding: 5px 0;
+        }
+        .accent-blue {
+            color: #2196F3;
+        }
+        .accent-blue-bg {
+            background-color: #2196F3;
+        }
+        .hidden {
+            display: none;
+        }
+        input[type="text"] {
+            color: #ffffff;
+        }
+        .add-button {
+            background-color: #2196F3;
+            color: #ffffff;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            text-align: center;
+            line-height: 30px;
+            cursor: pointer;
+        }
+        .legend {
+            margin-top: 10px;
+            text-align: center;
+        }
+        .delete-button {
+            color: red;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 10px;
+            outline: none;
+        }
+        .delete-button:focus {
+            outline: none;
+        }
+        .restrictedzone {
+            position: absolute;
+            background-color: rgba(255, 0, 0, 0.5);
+            border: 2px solid red;
+            z-index: 1;
+            width: 25px;
+            height: 25px;
+        }
+        .toggle-button {
+            background-color: #2196F3;
+            color: #ffffff;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            text-align: center;
+            line-height: 30px;
+            cursor: pointer;
+        }
+        .toggle-button.active {
+            background-color: #f44336;
         }
     </style>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const container = document.querySelector(".black-outline-box");
-            const nodePositions = [];
-            const processedIPs = new Set();
-
-            function updateNodes() {
-                // Clear existing nodes
-                container.innerHTML = '';
-
-                // Fetch node positions from the server
-                fetch("http://localhost:8080/get_nodespos")
-                    .then(response => response.json())
-                    .then(data => {
-                        data.nodes.forEach((node) => {
-                            const { ip, x, y } = node;
-
-                            // Mark the IP as processed
-                            processedIPs.add(ip);
-
-                            // Create image element
-                            const img = document.createElement("img");
-                            img.src = "static/node.png";
-                            img.alt = `Node ${ip}`;
-                            img.classList.add("draggable");
-                            img.style.left = `${x}px`;
-                            img.style.top = `${y}px`;
-
-                            // Disable default drag behavior
-                            img.addEventListener("dragstart", (e) => e.preventDefault());
-
-                            // Make image draggable
-                            img.addEventListener("mousedown", (e) => {
-                                const boxRect = container.getBoundingClientRect();
-                                const offsetX = e.clientX - img.getBoundingClientRect().left;
-                                const offsetY = e.clientY - img.getBoundingClientRect().top;
-
-                                const onMouseMove = (moveEvent) => {
-                                    let x = moveEvent.clientX - boxRect.left - offsetX;
-                                    let y = moveEvent.clientY - boxRect.top - offsetY;
-
-                                    // Restrict movement to the container
-                                    x = Math.max(0, Math.min(container.offsetWidth - img.offsetWidth, x));
-                                    y = Math.max(0, Math.min(container.offsetHeight - img.offsetHeight, y));
-
-                                    img.style.left = `${x}px`;
-                                    img.style.top = `${y}px`;
-                                };
-
-                                const onMouseUp = () => {
-                                    document.removeEventListener("mousemove", onMouseMove);
-                                    document.removeEventListener("mouseup", onMouseUp);
-
-                                    // Save the updated position
-                                    const x = parseInt(img.style.left);
-                                    const y = parseInt(img.style.top);
-
-                                    // Find the index of the node in the nodePositions array
-                                    const nodeIndex = nodePositions.findIndex(n => n.ip === ip);
-                                    if (nodeIndex !== -1) {
-                                        nodePositions[nodeIndex] = { ip, x, y };
-                                    } else {
-                                        nodePositions.push({ ip, x, y });
-                                    }
-
-                                    // Send updated positions to the server
-                                    fetch("http://localhost:8080/update_nodespos", {
-                                        method: "POST",
-                                        headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify(nodePositions),
-                                    }).catch(err => console.error("Error updating positions:", err));
-                                };
-
-                                document.addEventListener("mousemove", onMouseMove);
-                                document.addEventListener("mouseup", onMouseUp);
-                            });
-
-                            // Create label element
-                            const label = document.createElement("div");
-                            label.textContent = ip;
-                            label.classList.add("node-label");
-                            label.style.left = img.style.left;
-                            label.style.top = `${parseInt(img.style.top) + 25}px`;
-
-                            // Append image and label to the container
-                            container.appendChild(img);
-                            container.appendChild(label);
-                        });
-                    })
-                    .catch(err => console.error("Error fetching node positions:", err));
-            }
-
-            // Initial update
-            updateNodes();
-
-            // Listen for table update event
-            document.querySelector("#log-table").addEventListener("update", updateNodes);
-
-            // Make updateNodes globally accessible
-            window.updateNodes = updateNodes;
-        });
-    </script>
-    <script>
-        function refreshContent() {
-            fetch(window.location.href)
-                .then(response => response.text())
-                .then(html => {
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
-                    
-                    // Refresh table
-                    const newTableBody = doc.querySelector('#log-table tbody');
-                    document.querySelector('#log-table tbody').innerHTML = newTableBody.innerHTML;
-
-                    // Update nodes
-                    updateNodes();
-
-                    // Update devices
-                    updateDevices();
-                })
-                .catch(error => console.error('Error refreshing content:', error));
+        function deleteUnauthorizedMac(mac, listItem) {
+            $.ajax({
+                url: '/unauthorized_macs',
+                type: 'DELETE',
+                contentType: 'application/json',
+                data: JSON.stringify({ mac: mac }),
+                success: function() {
+                    listItem.remove();
+                }
+            });
         }
 
-        setInterval(refreshContent, 3000); // Refresh every 3 seconds
-    </script>
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const container = document.querySelector(".black-outline-box");
+        function isValidMacAddress(mac) {
+            const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
+            return macRegex.test(mac);
+        }
 
-            function updateDevices() {
-                // Clear existing devices
-                container.innerHTML = '';
+        function addUnauthorizedMac(mac) {
+            if (!isValidMacAddress(mac)) {
+                alert("Invalid MAC address format. Please enter a valid MAC address.");
+                return;
+            }
+            $.ajax({
+                url: '/unauthorized_macs',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ mac: mac }),
+                success: function() {
+                    const listItem = $('<li>').text(mac);
+                    const deleteButton = $('<button>').text('X').addClass('delete-button');
+                    deleteButton.on('click', function() {
+                        deleteUnauthorizedMac(mac, listItem);
+                    });
+                    listItem.append(deleteButton);
+                    $('#unauthorized-macs-list').append(listItem);
+                    $('#unauthorized-mac-input').val('');
+                }
+            });
+        }
 
-                // Fetch address coordinates from the server
-                fetch("http://localhost:8080/get_address_coordinates")
-                    .then(response => response.json())
-                    .then(data => {
-                        data.address_coordinates.forEach((device) => {
-                            const { address, x, y } = device;
+        function deleteRestrictedZone(zone, listItem) {
+            $.ajax({
+                url: '/restrictedzones',
+                type: 'DELETE',
+                contentType: 'application/json',
+                data: JSON.stringify({ restrictedzone: zone }),
+                success: function() {
+                    listItem.remove();
+                    removeRestrictedZoneElement(zone.x, zone.y);
+                }
+            });
+        }
 
-                            // Create image element
-                            const img = document.createElement("img");
-                            img.src = "static/device.png";
-                            img.alt = `Device ${address}`;
-                            img.classList.add("device");
-                            img.style.left = `${x}px`;
-                            img.style.top = `${y}px`;
-                            img.style.position = "absolute"; // Ensure the image is positioned absolutely
-
-                            // Create label element
-                            const label = document.createElement("div");
-                            label.textContent = address;
-                            label.classList.add("node-label");
-                            label.style.left = img.style.left;
-                            label.style.top = `${parseInt(img.style.top) + 25}px`;
-                            label.style.position = "absolute"; // Ensure the label is positioned absolutely
-
-                            // Append image and label to the container
-                            container.appendChild(img);
-                            container.appendChild(label);
+        function addRestrictedZone(zone) {
+            $.ajax({
+                url: '/restrictedzones/toggle',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ x: zone.x, y: zone.y }),
+                success: function(message) {
+                    M.toast({html: message});
+                    if (message === 'Restricted zone added') {
+                        const listItem = $('<li>').text(`(${zone.x}, ${zone.y})`).attr('data-x', zone.x).attr('data-y', zone.y);
+                        const deleteButton = $('<button>').text('X').addClass('delete-button');
+                        deleteButton.on('click', function() {
+                            deleteRestrictedZone(zone, listItem);
                         });
-                    })
-                    .catch(err => console.error("Error fetching address coordinates:", err));
+                        listItem.append(deleteButton);
+                        $('#restrictedzones-list').append(listItem);
+                        createRestrictedZoneElement(zone.x, zone.y);
+                    } else {
+                        removeRestrictedZoneElement(zone.x, zone.y);
+                        removeRestrictedZoneListItem(zone.x, zone.y);
+                    }
+                }
+            });
+        }
+
+        function createRestrictedZoneElement(x, y) {
+            const restrictedzone = document.createElement("div");
+            restrictedzone.classList.add("restrictedzone");
+            restrictedzone.style.left = `${x}px`;
+            restrictedzone.style.top = `${y}px`;
+            restrictedzone.dataset.x = x;
+            restrictedzone.dataset.y = y;
+            document.querySelector(".gridmap").appendChild(restrictedzone);
+        }
+
+        function removeRestrictedZoneElement(x, y) {
+            const restrictedzones = document.querySelectorAll(`.restrictedzone[data-x="${x}"][data-y="${y}"]`);
+            restrictedzones.forEach(restrictedzone => restrictedzone.remove());
+        }
+
+        function removeRestrictedZoneListItem(x, y) {
+            const listItem = $(`#restrictedzones-list li[data-x="${x}"][data-y="${y}"]`);
+            if (listItem) {
+                listItem.remove();
+            }
+        }
+
+        function findDevicesInRestrictedZones() {
+            const restrictedDevices = [];
+            const devices = document.querySelectorAll('.device');
+            const restrictedZones = document.querySelectorAll('.restrictedzone');
+
+            devices.forEach(device => {
+                const deviceRect = device.getBoundingClientRect();
+                restrictedZones.forEach(zone => {
+                    const zoneRect = zone.getBoundingClientRect();
+                    if (
+                        deviceRect.left < zoneRect.right &&
+                        deviceRect.right > zoneRect.left &&
+                        deviceRect.top < zoneRect.bottom &&
+                        deviceRect.bottom > zoneRect.top
+                    ) {
+                        restrictedDevices.push(device.alt);
+                    }
+                });
+            });
+
+            return restrictedDevices;
+        }
+
+        function updateRestrictedDevicesList(restrictedDevices) {
+            const list = $('#restrictedzones-list');
+            list.empty();
+            restrictedDevices.forEach(device => {
+                const listItem = $('<li>').text(device);
+                list.append(listItem);
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const container = document.querySelector(".gridmap");
+            let nodePositions = []; // Initialize nodePositions as an empty array
+            const processedIPs = new Set();
+            const socket = io();
+            const deviceElements = new Map(); // Map to store device elements
+            let isDrawing = false;
+            let startX, startY;
+            let drawingEnabled = false;
+
+            function createDraggableNode(ip, x, y) {
+                // Create image element
+                const img = document.createElement("img");
+                img.src = "/static/node.png";
+                img.alt = `Node ${ip}`;
+                img.classList.add("draggable");
+                img.style.left = `${x}px`;
+                img.style.top = `${y}px`;
+
+                // Disable default drag behavior
+                img.addEventListener("dragstart", (e) => e.preventDefault());
+
+                // Make image draggable
+                img.addEventListener("mousedown", (e) => {
+                    const boxRect = container.getBoundingClientRect();
+                    const offsetX = e.clientX - img.getBoundingClientRect().left;
+                    const offsetY = e.clientY - img.getBoundingClientRect().top;
+
+                    const onMouseMove = (moveEvent) => {
+                        let x = moveEvent.clientX - boxRect.left - offsetX;
+                        let y = moveEvent.clientY - boxRect.top - offsetY;
+
+                        // Restrict movement to the container
+                        x = Math.max(0, Math.min(container.offsetWidth - img.offsetWidth, x));
+                        y = Math.max(0, Math.min(container.offsetHeight - img.offsetHeight, y));
+
+                        img.style.left = `${x}px`;
+                        img.style.top = `${y}px`;
+
+                        // Update label position
+                        label.style.left = `${x}px`;
+                        label.style.top = `${y + 25}px`;
+                    };
+
+                    const onMouseUp = () => {
+                        document.removeEventListener("mousemove", onMouseMove);
+                        document.removeEventListener("mouseup", onMouseUp);
+
+                        // Save the updated position
+                        const x = parseInt(img.style.left);
+                        const y = parseInt(img.style.top);
+
+                        // Find the index of the node in the nodePositions array
+                        const nodeIndex = nodePositions.findIndex(n => n.ip === ip);
+                        if (nodeIndex !== -1) {
+                            nodePositions[nodeIndex] = { ip, x, y };
+                        } else {
+                            nodePositions.push({ ip, x, y });
+                        }
+
+                        // Emit the node_moved event to the server
+                        socket.emit('node_moved', { nodes: nodePositions });
+                    };
+
+                    document.addEventListener("mousemove", onMouseMove);
+                    document.addEventListener("mouseup", onMouseUp);
+                });
+
+                // Create label element
+                const label = document.createElement("div");
+                label.textContent = ip;
+                label.classList.add("node-label");
+                label.style.left = img.style.left;
+                label.style.top = `${parseInt(img.style.top) + 25}px`;
+
+                // Append image and label to the container
+                container.appendChild(img);
+                container.appendChild(label);
+
+                // Add node to nodePositions array
+                nodePositions.push({ ip, x, y });
             }
 
-            // Initial update
-            updateDevices();
+            function createDevice(address, x, y, name = null) {
+                // Create image element
+                const img = document.createElement("img");
+                img.src = "/static/device.png";
+                img.alt = `Device ${address}`;
+                img.classList.add("device");
+                img.style.left = `${x}px`;
+                img.style.top = `${y}px`;
+                img.style.position = "absolute"; // Ensure the image is positioned absolutely
 
-            // Make updateDevices globally accessible
-            window.updateDevices = updateDevices;
+                // Create label element
+                const label = document.createElement("div");
+                label.textContent = name || address; // Use name if available, otherwise use address
+                label.classList.add("node-label");
+                label.style.left = img.style.left;
+                label.style.top = `${parseInt(img.style.top) + 25}px`;
+                label.style.position = "absolute"; // Ensure the label is positioned absolutely
+
+                // Append image and label to the container
+                container.appendChild(img);
+                container.appendChild(label);
+
+                // Store the device elements in the map
+                deviceElements.set(address, { img, label });
+            }
+
+            function updateNodes(nodes) {
+                console.log("Updating nodes:", nodes);
+                // Clear existing nodes
+                container.innerHTML = '';
+                nodePositions = []; // Reset nodePositions array
+
+                nodes.forEach((node) => {
+                    const { ip, x, y } = node;
+                    processedIPs.add(ip);
+                    createDraggableNode(ip, x, y);
+                });
+            }
+
+            function updateDevices(devices) {
+                console.log("Updating devices:", devices);
+                if (!Array.isArray(devices)) {
+                    console.error("Devices is not an array:", devices);
+                    return;
+                }
+                devices.forEach((device) => {
+                    const { address, x, y, name } = device;
+                    if (deviceElements.has(address)) {
+                        // Update existing device position
+                        const { img, label } = deviceElements.get(address);
+                        img.style.left = `${x}px`;
+                        img.style.top = `${y}px`;
+                        label.style.left = img.style.left;
+                        label.style.top = `${parseInt(img.style.top) + 25}px`;
+                        label.textContent = name || address; // Update label text
+                    } else {
+                        // Create new device
+                        createDevice(address, x, y, name);
+                    }
+                });
+            }
+
+            function snapToGrid(value) {
+                return Math.floor(value / 25) * 25;
+            }
+
+            function handleClick(e) {
+                if (!drawingEnabled) return;
+                const rect = container.getBoundingClientRect();
+                const x = snapToGrid(e.clientX - rect.left);
+                const y = snapToGrid(e.clientY - rect.top);
+                const zone = { x, y };
+                addRestrictedZone(zone);
+            }
+
+            container.addEventListener("click", handleClick);
+
+            // Fetch initial node positions from the server
+            fetch('/get_nodespos')
+                .then(response => response.json())
+                .then(data => {
+                    updateNodes(data.nodes);
+                });
+
+            // Fetch initial restricted zones from the server
+            fetch('/restrictedzones')
+                .then(response => response.json())
+                .then(data => {
+                    data.restrictedzones.forEach(zone => {
+                        createRestrictedZoneElement(zone.x, zone.y);
+                    });
+                });
+
+            // Listen for updates from the server
+            socket.on('update_nodes', (data) => {
+                updateNodes(data.nodes);
+            });
+
+            socket.on('update_logs', (data) => {
+                // Update log table
+                const logTableBody = document.querySelector('#log-table tbody');
+                logTableBody.innerHTML = '';
+                for (const [ip, logs] of Object.entries(data.log_data)) {
+                    logs.forEach(log => {
+                        const row = document.createElement('tr');
+                        row.classList.add('log-row');
+                        row.innerHTML = `
+                            <td>${ip}</td>
+                            <td>${log[0]}</td>
+                            <td class="device-name">${log[1]}</td>
+                            <td>${log[2]}</td>
+                            <td>${log[3]}</td>
+                            <td class="log-data" style="display:none">${log[4]}</td>
+                        `;
+                        logTableBody.appendChild(row);
+                    });
+                }
+                // Ensure address_coordinates is an array
+                const addressCoordinatesArray = Object.entries(data.address_coordinates).map(([address, coords]) => ({
+                    address,
+                    x: coords[0],
+                    y: coords[1],
+                    name: coords[2] // Get the name from address_coordinates
+                }));
+                // Update devices
+                updateDevices(addressCoordinatesArray);
+                updateRestrictedDevicesList(data.restricted_devices);
+            });
+
+            // Filter Bluetooth devices with names
+            function filterBluetoothDevices(showBluetooth) {
+                document.querySelectorAll(".log-row").forEach(row => {
+                    const deviceName = row.querySelector(".device-name").textContent;
+                    if (showBluetooth && !deviceName) {
+                        row.style.display = "none";
+                    } else {
+                        row.style.display = "";
+                    }
+                });
+                document.querySelectorAll(".device").forEach(device => {
+                    const deviceName = device.alt.split(' ')[1];
+                    if (showBluetooth && !deviceName) {
+                        device.style.display = "none";
+                    } else {
+                        device.style.display = "";
+                    }
+                });
+            }
+
+            document.querySelectorAll("#showBluetooth").forEach(checkbox => {
+                checkbox.addEventListener("change", (e) => {
+                    const showBluetooth = e.target.checked;
+                    filterBluetoothDevices(showBluetooth);
+                });
+            });
+
+            // Tab functionality
+            document.querySelectorAll(".tab a").forEach(tab => {
+                tab.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    const target = e.target.getAttribute("href").substring(1);
+                    document.querySelectorAll(".tab-content").forEach(content => {
+                        content.classList.add("hidden");
+                    });
+                    document.getElementById(target).classList.remove("hidden");
+                });
+            });
+
+            // Show the grid map tab by default
+            document.getElementById("gridmap-tab").classList.remove("hidden");
+
+            // Toggle selection mode for restricted zone
+            $('#enable-drawing').click(function() {
+                drawingEnabled = !drawingEnabled;
+                $(this).toggleClass('active');
+                if (drawingEnabled) {
+                    M.toast({html: 'Selection mode enabled. Click to toggle zones.'});
+                } else {
+                    M.toast({html: 'Selection mode disabled.'});
+                }
+            });
+        });
+
+        $(document).ready(function() {
+            // Load unauthorized MAC addresses
+            $.get('/unauthorized_macs', function(data) {
+                data.unauthorized_macs.forEach(function(mac) {
+                    const listItem = $('<li>').text(mac);
+                    const deleteButton = $('<button>').text('X').addClass('delete-button');
+                    deleteButton.on('click', function() {
+                        deleteUnauthorizedMac(mac, listItem);
+                    });
+                    listItem.append(deleteButton);
+                    $('#unauthorized-macs-list').append(listItem);
+                });
+            });
+
+            // Load restricted zones
+            $.get('/restrictedzones', function(data) {
+                data.restrictedzones.forEach(function(zone) {
+                    const listItem = $('<li>').text(`(${zone.x}, ${zone.y})`).attr('data-x', zone.x).attr('data-y', zone.y);
+                    const deleteButton = $('<button>').text('X').addClass('delete-button');
+                    deleteButton.on('click', function() {
+                        deleteRestrictedZone(zone, listItem);
+                    });
+                    listItem.append(deleteButton);
+                    $('#restrictedzones-list').append(listItem);
+                    createRestrictedZoneElement(zone.x, zone.y);
+                });
+            });
+
+            // Add unauthorized MAC address
+            $('#add-unauthorized-mac-form').submit(function(event) {
+                event.preventDefault();
+                const mac = $('#unauthorized-mac-input').val();
+                addUnauthorizedMac(mac);
+            });
+
+            // Enable drawing for restricted zone
+            $('#add-restrictedzone-form').submit(function(event) {
+                event.preventDefault();
+                drawingEnabled = true;
+                M.toast({html: 'Select area for restricted zone'});
+            });
+
+            // Toggle selection mode for restricted zone
+            $('#enable-drawing').click(function() {
+                drawingEnabled = !drawingEnabled;
+                $(this).toggleClass('active');
+                if (drawingEnabled) {
+                    M.toast({html: 'Selection mode enabled. Drag to select zones.'});
+                } else {
+                    M.toast({html: 'Selection mode disabled.'});
+                }
+            });
         });
     </script>
 </head>
 <body>
-    <h1>Log Viewer</h1>
-    <label>
-        <input type="checkbox" id="showBluetooth" onclick="toggleBluetoothDevices()">
-        Show only Bluetooth devices with a name
-    </label>
-    <table id="log-table" border="1">
-        <thead>
-            <tr>
-                <th>IP Address</th>
-                <th>Time</th>
-                <th>Device Name</th>
-                <th>MAC Address</th>
-                <th>Signal Strength</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for ip, logs in log_data.items() %}
-                {% for log in logs %}
-                    <tr class="log-row">
-                        <td>{{ ip }}</td>
-                        <td>{{ log[0] }}</td>
-                        <td class="device-name">{{ log[1] }}</td>
-                        <td>{{ log[2] }}</td>
-                        <td>{{ log[3] }}</td>
-                        <td class="log-data" style="display:none">{{ log[4] }}</td>
-                    </tr>
-                {% endfor %}
-            {% endfor %}
-        </tbody>
-    </table>
-    <div id="black-outline-box" class="black-outline-box"></div>
+    <div class="container">
+        <h1 class="center-align accent-blue">Bluepath</h1>
+        <div class="row">
+            <div class="col s12">
+                <ul class="tabs accent-blue-bg">
+                    <li class="tab col s4"><a href="#gridmap-tab">Grid Map</a></li>
+                    <li class="tab col s4"><a href="#logs-tab">Logs</a></li>
+                    <li class="tab col s4"><a href="#device-history-tab">Device History</a></li>
+                </ul>
+            </div>
+            <div id="gridmap-tab" class="col s12 tab-content hidden">
+                <div class="row">
+                    <div class="col s8">
+                        <label>
+                            <input type="checkbox" id="showBluetooth">
+                            <span>Show only Bluetooth devices with a name</span>
+                        </label>
+                        <div id="gridmap" class="gridmap"></div>
+                        <div class="legend">
+                            <span>1 meter = 100px</span>
+                        </div>
+                    </div>
+                    <div class="col s4 sidebar">
+                        <h5 class="accent-blue">Unauthorized MAC Addresses</h5>
+                        <form id="add-unauthorized-mac-form">
+                            <input type="text" id="unauthorized-mac-input" placeholder="Enter MAC address" required>
+                            <button type="submit" class="add-button">+</button>
+                        </form>
+                        <ul id="unauthorized-macs-list"></ul>
+                        <h5 class="accent-blue">Restricted Zones</h5>
+                        <button type="button" class="toggle-button" id="enable-drawing">+</button>
+                        <h5 class="accent-blue">Unauthorized Devices in Restricted Zones</h5>
+                        <ul id="restrictedzones-list"></ul>
+                    </div>
+                </div>
+            </div>
+            <div id="logs-tab" class="col s12 tab-content hidden">
+                <label>
+                    <input type="checkbox" id="showBluetooth">
+                    <span>Show only Bluetooth devices with a name</span>
+                </label>
+                <table id="log-table" class="highlight">
+                    <thead>
+                        <tr>
+                            <th>IP Address</th>
+                            <th>Time</th>
+                            <th>Device Name</th>
+                            <th>MAC Address</th>
+                            <th>Signal Strength</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ip, logs in log_data.items() %}
+                            {% for log in logs %}
+                                <tr class="log-row">
+                                    <td>{{ ip }}</td>
+                                    <td>{{ log[0] }}</td>
+                                    <td class="device-name">{{ log[1] }}</td>
+                                    <td>{{ log[2] }}</td>
+                                    <td>{{ log[3] }}</td>
+                                    <td class="log-data" style="display:none">{{ log[4] }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div id="device-history-tab" class="col s12 tab-content hidden">
+                <h2>Device History</h2>
+                <div>
+                    <label for="mac-select">Select MAC Address:</label>
+                    <select id="mac-select">
+                        {% for mac in unauthorized_macs %}
+                            <option value="{{ mac }}">{{ mac }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div id="history">
+                    <h3>Movement History</h3>
+                    <ul id="history-list">
+                        <!-- Movement history will be populated here -->
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.querySelectorAll('.tabs a').forEach(tab => {
+            tab.addEventListener('click', function(event) {
+                event.preventDefault();
+                document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
+                document.querySelector(this.getAttribute('href')).style.display = 'block';
+            });
+        });
+        document.getElementById('mac-select').addEventListener('change', function() {
+            const selectedMac = this.value;
+            const historyList = document.getElementById('history-list');
+            historyList.innerHTML = '';
+            const coordinates = {{ address_coordinates | tojson }};
+            if (coordinates[selectedMac]) {
+                const history = coordinates[selectedMac];
+                history.forEach(entry => {
+                    const li = document.createElement('li');
+                    li.textContent = `X: ${entry[0]}, Y: ${entry[1]}, Name: ${entry[2]}`;
+                    historyList.appendChild(li);
+                });
+            }
+        });
+        // Initialize the first tab
+        document.querySelector('.tabs a').click();
+    </script>
 </body>
 </html>
