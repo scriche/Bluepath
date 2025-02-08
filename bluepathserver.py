@@ -15,7 +15,7 @@ socketio = SocketIO(app)
 log_data = defaultdict(list)
 address_coordinates = {}
 nodepos = []
-unauthorized_macs = set()
+authorized_macs = set()
 restrictedzones = []
 users = {}
 
@@ -28,12 +28,12 @@ def load_users():
     except FileNotFoundError:
         pass
 
-# Load unauthorized MAC addresses and restricted zones from JSON files
+# Load authorized MAC addresses and restricted zones from JSON files
 def load_persistent_data():
-    global unauthorized_macs, restrictedzones
+    global authorized_macs, restrictedzones
     try:
-        with open('unauthorized.json', 'r') as f:
-            unauthorized_macs = set(json.load(f))
+        with open('authorized.json', 'r') as f:
+            authorized_macs = set(json.load(f))
     except FileNotFoundError:
         pass
     try:
@@ -42,10 +42,10 @@ def load_persistent_data():
     except FileNotFoundError:
         pass
 
-# Save unauthorized MAC addresses to JSON file
-def save_unauthorized_macs():
-    with open('unauthorized.json', 'w') as f:
-        json.dump(list(unauthorized_macs), f)
+# Save authorized MAC addresses to JSON file
+def save_authorized_macs():
+    with open('authorized.json', 'w') as f:
+        json.dump(list(authorized_macs), f)
 
 # Save restricted zones to JSON file
 def save_restrictedzones():
@@ -76,13 +76,13 @@ def logout():
 def index():
     if 'username' not in session:
         return redirect(url_for('login'))
-    return render_template('index.html', log_data=log_data, address_coordinates=address_coordinates, unauthorized_macs=unauthorized_macs)
+    return render_template('index.html', log_data=log_data, address_coordinates=address_coordinates, authorized_macs=authorized_macs)
 
 @app.route('/device_history')
 def device_history():
     if 'username' not in session:
         return redirect(url_for('login'))
-    return render_template('device_history.html', address_coordinates=address_coordinates, unauthorized_macs=unauthorized_macs)
+    return render_template('device_history.html', address_coordinates=address_coordinates, authorized_macs=authorized_macs)
 
 @app.route('/update_nodespos', methods=['POST'])
 def update_nodespos():
@@ -122,26 +122,26 @@ def receive_log():
     socketio.emit('update_logs', {'log_data': log_data, 'address_coordinates': address_coordinates, 'restricted_devices': restricted_devices})
     return 'Log received', 200
 
-@app.route('/unauthorized_macs', methods=['POST'])
-def add_unauthorized_mac():
+@app.route('/authorized_macs', methods=['POST'])
+def add_authorized_mac():
     data = request.get_json()
     mac = data['mac']
-    unauthorized_macs.add(mac)
-    save_unauthorized_macs()
-    return 'Unauthorized MAC address added', 200
+    authorized_macs.add(mac)
+    save_authorized_macs()
+    return 'Authorized MAC address added', 200
 
-@app.route('/unauthorized_macs', methods=['GET'])
-def get_unauthorized_macs():
-    return jsonify({'unauthorized_macs': list(unauthorized_macs)}), 200
+@app.route('/authorized_macs', methods=['GET'])
+def get_authorized_macs():
+    return jsonify({'authorized_macs': list(authorized_macs)}), 200
 
-@app.route('/unauthorized_macs', methods=['DELETE'])
-def delete_unauthorized_mac():
+@app.route('/authorized_macs', methods=['DELETE'])
+def delete_authorized_mac():
     data = request.get_json()
     mac = data['mac']
-    if mac in unauthorized_macs:
-        unauthorized_macs.remove(mac)
-        save_unauthorized_macs()
-        return 'Unauthorized MAC address deleted', 200
+    if mac in authorized_macs:
+        authorized_macs.remove(mac)
+        save_authorized_macs()
+        return 'Authorized MAC address deleted', 200
     return 'MAC address not found', 404
 
 @app.route('/restrictedzones', methods=['POST'])
@@ -235,7 +235,7 @@ def calulate_position():
 def find_devices_in_restricted_zones():
     restricted_devices = []
     for address, (x, y, name) in address_coordinates.items():
-        if address in unauthorized_macs:
+        if address not in authorized_macs:
             for zone in restrictedzones:
                 if zone['x'] < x + 20 and x < zone['x'] + 25 and zone['y'] < y + 20 and y < zone['y'] + 25:
                     restricted_devices.append(address)

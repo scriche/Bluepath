@@ -130,13 +130,16 @@
         .toggle-button.active {
             background-color: #f44336;
         }
+        .unauthorized-device {
+            border: 2px solid red;
+        }
     </style>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
-        function deleteUnauthorizedMac(mac, listItem) {
+        function deleteAuthorizedMac(mac, listItem) {
             $.ajax({
-                url: '/unauthorized_macs',
+                url: '/authorized_macs',
                 type: 'DELETE',
                 contentType: 'application/json',
                 data: JSON.stringify({ mac: mac }),
@@ -151,13 +154,13 @@
             return macRegex.test(mac);
         }
 
-        function addUnauthorizedMac(mac) {
+        function addAuthorizedMac(mac) {
             if (!isValidMacAddress(mac)) {
                 alert("Invalid MAC address format. Please enter a valid MAC address.");
                 return;
             }
             $.ajax({
-                url: '/unauthorized_macs',
+                url: '/authorized_macs',
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({ mac: mac }),
@@ -165,11 +168,11 @@
                     const listItem = $('<li>').text(mac);
                     const deleteButton = $('<button>').text('X').addClass('delete-button');
                     deleteButton.on('click', function() {
-                        deleteUnauthorizedMac(mac, listItem);
+                        deleteAuthorizedMac(mac, listItem);
                     });
                     listItem.append(deleteButton);
-                    $('#unauthorized-macs-list').append(listItem);
-                    $('#unauthorized-mac-input').val('');
+                    $('#authorized-macs-list').append(listItem);
+                    $('#authorized-mac-input').val('');
                 }
             });
         }
@@ -257,12 +260,30 @@
             return restrictedDevices;
         }
 
+        function sendNotification(message) {
+            if (Notification.permission === "granted") {
+                new Notification(message);
+            } else if (Notification.permission !== "denied") {
+                Notification.requestPermission().then(permission => {
+                    if (permission === "granted") {
+                        new Notification(message);
+                    }
+                });
+            }
+        }
+
         function updateRestrictedDevicesList(restrictedDevices) {
             const list = $('#restrictedzones-list');
             list.empty();
             restrictedDevices.forEach(device => {
-                const listItem = $('<li>').text(device);
+                const listItem = $('<li>').text(device).css('color', 'red');
                 list.append(listItem);
+                const deviceElement = document.querySelector(`.device[alt="Device ${device}"]`);
+                if (deviceElement) {
+                    deviceElement.classList.add('unauthorized-device');
+                }
+                M.toast({html: `Unauthorized device ${device} detected in restricted zone!`});
+                sendNotification(`Unauthorized device ${device} detected in restricted zone!`);
             });
         }
 
@@ -530,22 +551,34 @@
                     M.toast({html: 'Selection mode disabled.'});
                 }
             });
-        });
 
-        $(document).ready(function() {
-            // Load unauthorized MAC addresses
-            $.get('/unauthorized_macs', function(data) {
-                data.unauthorized_macs.forEach(function(mac) {
+            // Load authorized MAC addresses
+            $.get('/authorized_macs', function(data) {
+                data.authorized_macs.forEach(function(mac) {
                     const listItem = $('<li>').text(mac);
                     const deleteButton = $('<button>').text('X').addClass('delete-button');
                     deleteButton.on('click', function() {
-                        deleteUnauthorizedMac(mac, listItem);
+                        deleteAuthorizedMac(mac, listItem);
                     });
                     listItem.append(deleteButton);
-                    $('#unauthorized-macs-list').append(listItem);
+                    $('#authorized-macs-list').append(listItem);
                 });
             });
 
+            // Add authorized MAC address
+            $('#add-authorized-mac-form').submit(function(event) {
+                event.preventDefault();
+                const mac = $('#authorized-mac-input').val();
+                addAuthorizedMac(mac);
+            });
+
+            // Request notification permission on page load
+            if (Notification.permission !== "granted") {
+                Notification.requestPermission();
+            }
+        });
+
+        $(document).ready(function() {
             // Load restricted zones
             $.get('/restrictedzones', function(data) {
                 data.restrictedzones.forEach(function(zone) {
@@ -558,13 +591,6 @@
                     $('#restrictedzones-list').append(listItem);
                     createRestrictedZoneElement(zone.x, zone.y);
                 });
-            });
-
-            // Add unauthorized MAC address
-            $('#add-unauthorized-mac-form').submit(function(event) {
-                event.preventDefault();
-                const mac = $('#unauthorized-mac-input').val();
-                addUnauthorizedMac(mac);
             });
 
             // Enable drawing for restricted zone
@@ -611,16 +637,15 @@
                         </div>
                     </div>
                     <div class="col s4 sidebar">
-                        <h5 class="accent-blue">Unauthorized MAC Addresses</h5>
-                        <form id="add-unauthorized-mac-form">
-                            <input type="text" id="unauthorized-mac-input" placeholder="Enter MAC address" required>
+                        <h5 class="accent-blue">Authorized MAC Addresses</h5>
+                        <form id="add-authorized-mac-form">
+                            <input type="text" id="authorized-mac-input" placeholder="Enter MAC address" required>
                             <button type="submit" class="add-button">+</button>
                         </form>
-                        <ul id="unauthorized-macs-list"></ul>
+                        <ul id="authorized-macs-list"></ul>
                         <h5 class="accent-blue">Restricted Zones</h5>
                         <button type="button" class="toggle-button" id="enable-drawing">+</button>
                         <h5 class="accent-blue">Unauthorized Devices in Restricted Zones</h5>
-                        <ul id="restrictedzones-list"></ul>
                     </div>
                 </div>
             </div>
