@@ -7,6 +7,7 @@ from collections import defaultdict
 import requests
 import numpy as np
 from flask_cors import CORS
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -18,6 +19,7 @@ nodepos = []
 authorized_macs = set()
 restrictedzones = []
 users = {}
+device_history = defaultdict(list)
 
 # Load users from JSON file
 def load_users():
@@ -42,6 +44,15 @@ def load_persistent_data():
     except FileNotFoundError:
         pass
 
+# Load device history from JSON file
+def load_device_history():
+    global device_history
+    try:
+        with open('device_history.json', 'r') as f:
+            device_history = defaultdict(list, json.load(f))
+    except FileNotFoundError:
+        pass
+
 # Save authorized MAC addresses to JSON file
 def save_authorized_macs():
     with open('authorized.json', 'w') as f:
@@ -52,8 +63,14 @@ def save_restrictedzones():
     with open('restricted.json', 'w') as f:
         json.dump(restrictedzones, f)
 
+# Save device history to JSON file
+def save_device_history():
+    with open('device_history.json', 'w') as f:
+        json.dump(device_history, f)
+
 load_users()
 load_persistent_data()
+load_device_history()
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -79,10 +96,17 @@ def index():
     return render_template('index.html', log_data=log_data, address_coordinates=address_coordinates, authorized_macs=authorized_macs)
 
 @app.route('/device_history')
-def device_history():
+def get_device_history_page():
     if 'username' not in session:
         return redirect(url_for('login'))
     return render_template('device_history.html', address_coordinates=address_coordinates, authorized_macs=authorized_macs)
+
+@app.route('/device_history/<address>', methods=['GET'])
+def get_device_history(address):
+    if 'username' not in session:
+        return redirect(url_for('login'))
+    history = device_history.get(address, [])
+    return jsonify({'history': history})
 
 @app.route('/update_nodespos', methods=['POST'])
 def update_nodespos():
@@ -229,6 +253,9 @@ def calulate_position():
                 x, y = trilaterate(node_a, r1, node_b, r2, node_c, r3)
                 name = address_names.get(address, address)  # Get the name or fallback to address
                 address_coordinates[address] = (x, y, name)
+                # Store the location history
+                device_history[address].append({'date': str(datetime.now().date()), 'time': str(datetime.now().time()), 'x': x, 'y': y})
+                save_device_history()
             except ValueError as e:
                 print(f"Error calculating position for address {address}: {e}")
 

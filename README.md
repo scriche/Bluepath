@@ -38,6 +38,10 @@
 
 The server will start listening for UDP packets and will also run a Flask web server to display the logs.
 
+## Viewing Web Interface
+
+Open a web browser and navigate to `http://<server_ip>:8080` to view the logs.
+
 ### Client
 
 1. Run the client:
@@ -57,7 +61,3 @@ The client will continuously send the log file to the server every 3 seconds.
     ```
 
 This script will monitor nearby Bluetooth devices and log their information to `bluepath.log`.
-
-## Viewing Logs
-
-Open a web browser and navigate to `http://<server_ip>:8080` to view the logs.

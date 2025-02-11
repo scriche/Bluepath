@@ -133,6 +133,23 @@
         .unauthorized-device {
             border: 2px solid red;
         }
+        .device-list {
+            list-style-type: none;
+            padding: 0;
+        }
+        .device-list li {
+            padding: 5px 0;
+            color: #ffffff;
+            cursor: pointer;
+        }
+        .history-list {
+            list-style-type: none;
+            padding: 0;
+            color: #ffffff;
+        }
+        .history-list li {
+            padding: 5px 0;
+        }
     </style>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -197,7 +214,6 @@
                 contentType: 'application/json',
                 data: JSON.stringify({ x: zone.x, y: zone.y }),
                 success: function(message) {
-                    M.toast({html: message});
                     if (message === 'Restricted zone added') {
                         const listItem = $('<li>').text(`(${zone.x}, ${zone.y})`).attr('data-x', zone.x).attr('data-y', zone.y);
                         const deleteButton = $('<button>').text('X').addClass('delete-button');
@@ -272,8 +288,10 @@
             }
         }
 
+        const notifiedDevices = new Set();
+
         function updateRestrictedDevicesList(restrictedDevices) {
-            const list = $('#restrictedzones-list');
+            const list = $('#unauthorized-devices-list');
             list.empty();
             restrictedDevices.forEach(device => {
                 const listItem = $('<li>').text(device).css('color', 'red');
@@ -282,13 +300,22 @@
                 if (deviceElement) {
                     deviceElement.classList.add('unauthorized-device');
                 }
-                M.toast({html: `Unauthorized device ${device} detected in restricted zone!`});
-                sendNotification(`Unauthorized device ${device} detected in restricted zone!`);
+                if (!notifiedDevices.has(device)) {
+                    sendNotification(`Unauthorized device ${device} detected in restricted zone!`);
+                    notifiedDevices.add(device);
+                }
+            });
+            // Remove devices that are no longer in restricted zones from the notified set
+            notifiedDevices.forEach(device => {
+                if (!restrictedDevices.includes(device)) {
+                    notifiedDevices.delete(device);
+                }
             });
         }
 
         document.addEventListener("DOMContentLoaded", () => {
             const container = document.querySelector(".gridmap");
+            const historyContainer = document.querySelector("#history-gridmap");
             let nodePositions = []; // Initialize nodePositions as an empty array
             const processedIPs = new Set();
             const socket = io();
@@ -430,6 +457,18 @@
                         createDevice(address, x, y, name);
                     }
                 });
+                // Update device list in the device history tab
+                const deviceList = document.getElementById('device-list');
+                deviceList.innerHTML = '';
+                devices.forEach(device => {
+                    const listItem = document.createElement('li');
+                    listItem.textContent = device.name || device.address;
+                    listItem.dataset.address = device.address;
+                    listItem.addEventListener('click', () => {
+                        fetchDeviceHistory(device.address);
+                    });
+                    deviceList.appendChild(listItem);
+                });
             }
 
             function snapToGrid(value) {
@@ -445,7 +484,32 @@
                 addRestrictedZone(zone);
             }
 
+            function fetchDeviceHistory(address) {
+                fetch(`/device_history/${address}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        const historyList = document.getElementById('history-list');
+                        historyList.innerHTML = '';
+                        const dates = new Set();
+                        data.history.forEach(entry => {
+                            const date = entry.date.split(' ')[0]; // Extract the date part
+                            if (!dates.has(date)) {
+                                dates.add(date);
+                                const listItem = document.createElement('li');
+                                listItem.textContent = date;
+                                historyList.appendChild(listItem);
+                            }
+                        });
+                        // Add feedback for selected device
+                        const feedback = document.createElement('p');
+                        feedback.textContent = `Showing history for device: ${address}`;
+                        feedback.style.color = 'lightgreen';
+                        historyList.prepend(feedback);
+                    });
+            }
+
             container.addEventListener("click", handleClick);
+            historyContainer.addEventListener("click", handleClick);
 
             // Fetch initial node positions from the server
             fetch('/get_nodespos')
@@ -545,11 +609,6 @@
             $('#enable-drawing').click(function() {
                 drawingEnabled = !drawingEnabled;
                 $(this).toggleClass('active');
-                if (drawingEnabled) {
-                    M.toast({html: 'Selection mode enabled. Click to toggle zones.'});
-                } else {
-                    M.toast({html: 'Selection mode disabled.'});
-                }
             });
 
             // Load authorized MAC addresses
@@ -576,6 +635,15 @@
             if (Notification.permission !== "granted") {
                 Notification.requestPermission();
             }
+
+            // Update location every 30 seconds
+            setInterval(() => {
+                fetch('/get_nodespos')
+                    .then(response => response.json())
+                    .then(data => {
+                        updateNodes(data.nodes);
+                    });
+            }, 30000);
         });
 
         $(document).ready(function() {
@@ -604,11 +672,6 @@
             $('#enable-drawing').click(function() {
                 drawingEnabled = !drawingEnabled;
                 $(this).toggleClass('active');
-                if (drawingEnabled) {
-                    M.toast({html: 'Selection mode enabled. Drag to select zones.'});
-                } else {
-                    M.toast({html: 'Selection mode disabled.'});
-                }
             });
         });
     </script>
@@ -646,6 +709,7 @@
                         <h5 class="accent-blue">Restricted Zones</h5>
                         <button type="button" class="toggle-button" id="enable-drawing">+</button>
                         <h5 class="accent-blue">Unauthorized Devices in Restricted Zones</h5>
+                        <ul id="unauthorized-devices-list"></ul>
                     </div>
                 </div>
             </div>
@@ -681,20 +745,19 @@
                 </table>
             </div>
             <div id="device-history-tab" class="col s12 tab-content hidden">
-                <h2>Device History</h2>
-                <div>
-                    <label for="mac-select">Select MAC Address:</label>
-                    <select id="mac-select">
-                        {% for mac in unauthorized_macs %}
-                            <option value="{{ mac }}">{{ mac }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div id="history">
-                    <h3>Movement History</h3>
-                    <ul id="history-list">
-                        <!-- Movement history will be populated here -->
-                    </ul>
+                <div class="row">
+                    <div class="col s8">
+                        <div id="history-gridmap" class="gridmap"></div>
+                        <div class="legend">
+                            <span>1 meter = 100px</span>
+                        </div>
+                    </div>
+                    <div class="col s4 sidebar">
+                        <h5 class="accent-blue">Device List</h5>
+                        <ul id="device-list" class="device-list"></ul>
+                        <h5 class="accent-blue">Location History</h5>
+                        <ul id="history-list" class="history-list"></ul>
+                    </div>
                 </div>
             </div>
         </div>
