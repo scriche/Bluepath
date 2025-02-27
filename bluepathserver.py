@@ -7,7 +7,7 @@ from collections import defaultdict
 import requests
 import numpy as np
 from flask_cors import CORS
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -19,7 +19,8 @@ nodepos = []
 authorized_macs = set()
 restrictedzones = []
 users = {}
-device_history = defaultdict(list)
+device_history = defaultdict(dict)  # Change to defaultdict(dict)
+last_update_time = defaultdict(lambda: datetime.min)  # Track the last update time for each address
 
 # Load users from JSON file
 def load_users():
@@ -49,7 +50,16 @@ def load_device_history():
     global device_history
     try:
         with open('device_history.json', 'r') as f:
-            device_history = defaultdict(list, json.load(f))
+            device_history.update(json.load(f))
+    except FileNotFoundError:
+        pass
+
+# Load node positions from JSON file
+def load_node_positions():
+    global nodepos
+    try:
+        with open('node_positions.json', 'r') as f:
+            nodepos = json.load(f)
     except FileNotFoundError:
         pass
 
@@ -66,11 +76,17 @@ def save_restrictedzones():
 # Save device history to JSON file
 def save_device_history():
     with open('device_history.json', 'w') as f:
-        json.dump(device_history, f)
+        json.dump(device_history, f, default=dict, indent=4)  # Add indent for better readability
+
+# Save node positions to JSON file
+def save_node_positions():
+    with open('node_positions.json', 'w') as f:
+        json.dump(nodepos, f)
 
 load_users()
 load_persistent_data()
 load_device_history()
+load_node_positions()
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -105,8 +121,13 @@ def get_device_history_page():
 def get_device_history(address):
     if 'username' not in session:
         return redirect(url_for('login'))
-    history = device_history.get(address, [])
-    return jsonify({'history': history})
+    history = device_history.get(address, {})
+    # Convert the history dictionary to a list of entries
+    history_list = []
+    for date, entries in history.items():
+        for entry in entries:
+            history_list.append({'date': date, 'time': entry['time'], 'x': entry['x'], 'y': entry['y']})
+    return jsonify({'history': history_list})
 
 @app.route('/update_nodespos', methods=['POST'])
 def update_nodespos():
@@ -114,6 +135,7 @@ def update_nodespos():
     nodepos.clear()
     for node in data:
         nodepos.append((node['ip'], node['x'], node['y']))
+    save_node_positions()
     socketio.emit('update_nodes', {'nodes': nodepos}, broadcast=True)
     return 'Node positions updated', 200
 
@@ -205,6 +227,14 @@ def delete_restrictedzone():
         return 'Restricted zone deleted', 200
     return 'Restricted zone not found', 404
 
+@app.route('/refresh_nodespos', methods=['GET'])
+def refresh_nodespos():
+    try:
+        socketio.emit('update_nodes', {'nodes': nodepos}, broadcast=True)
+    except TypeError as e:
+        print(f"Error emitting socket event: {e}")
+    return 'Node positions refreshed', 200
+
 def trilaterate(node_a, r1, node_b, r2, node_c, r3):
     # Calculate the coordinates of the address using trilateration
     # r1, r2, r3 are the distances from the address to the nodes
@@ -251,11 +281,19 @@ def calulate_position():
             r1, r2, r3 = distances
             try:
                 x, y = trilaterate(node_a, r1, node_b, r2, node_c, r3)
+                x, y = round(x), round(y)  # Round coordinates to whole numbers
                 name = address_names.get(address, address)  # Get the name or fallback to address
                 address_coordinates[address] = (x, y, name)
-                # Store the location history
-                device_history[address].append({'date': str(datetime.now().date()), 'time': str(datetime.now().time()), 'x': x, 'y': y})
-                save_device_history()
+                # Store the location history under today's date with a different timestamp every 30 seconds
+                date_str = str(datetime.now().date())
+                time_str = str(datetime.now().time())
+                if date_str not in device_history[address]:
+                    device_history[address][date_str] = []
+                # Check if the last entry was added more than 30 seconds ago
+                if (datetime.now() - last_update_time[address]) > timedelta(seconds=30):
+                    device_history[address][date_str].append({'time': time_str, 'x': x, 'y': y})
+                    last_update_time[address] = datetime.now()
+                    save_device_history()
             except ValueError as e:
                 print(f"Error calculating position for address {address}: {e}")
 
@@ -275,6 +313,7 @@ def handle_node_moved(data):
     nodepos.clear()
     for node in data['nodes']:
         nodepos.append((node['ip'], node['x'], node['y']))
+    save_node_positions()
     calulate_position()
     restricted_devices = find_devices_in_restricted_zones()
     try:

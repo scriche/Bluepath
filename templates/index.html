@@ -150,6 +150,22 @@
         .history-list li {
             padding: 5px 0;
         }
+        .selected-device {
+            background-color: #424242;
+            color: #ffffff;
+        }
+        .selected-date {
+            background-color: #333333;
+            color: #ffffff;
+        }
+        .history-dot {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: red;
+            border-radius: 50%;
+            z-index: 20;
+        }
     </style>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -464,9 +480,6 @@
                     const listItem = document.createElement('li');
                     listItem.textContent = device.name || device.address;
                     listItem.dataset.address = device.address;
-                    listItem.addEventListener('click', () => {
-                        fetchDeviceHistory(device.address);
-                    });
                     deviceList.appendChild(listItem);
                 });
             }
@@ -482,30 +495,6 @@
                 const y = snapToGrid(e.clientY - rect.top);
                 const zone = { x, y };
                 addRestrictedZone(zone);
-            }
-
-            function fetchDeviceHistory(address) {
-                fetch(`/device_history/${address}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        const historyList = document.getElementById('history-list');
-                        historyList.innerHTML = '';
-                        const dates = new Set();
-                        data.history.forEach(entry => {
-                            const date = entry.date.split(' ')[0]; // Extract the date part
-                            if (!dates.has(date)) {
-                                dates.add(date);
-                                const listItem = document.createElement('li');
-                                listItem.textContent = date;
-                                historyList.appendChild(listItem);
-                            }
-                        });
-                        // Add feedback for selected device
-                        const feedback = document.createElement('p');
-                        feedback.textContent = `Showing history for device: ${address}`;
-                        feedback.style.color = 'lightgreen';
-                        historyList.prepend(feedback);
-                    });
             }
 
             container.addEventListener("click", handleClick);
@@ -636,14 +625,55 @@
                 Notification.requestPermission();
             }
 
-            // Update location every 30 seconds
-            setInterval(() => {
-                fetch('/get_nodespos')
-                    .then(response => response.json())
-                    .then(data => {
-                        updateNodes(data.nodes);
+            // Add event listener for history dates
+            document.getElementById('history-list').addEventListener('click', (event) => {
+                if (event.target.classList.contains('history-date')) {
+                    document.querySelectorAll('.history-date').forEach(date => {
+                        date.classList.remove('selected-date');
                     });
-            }, 30000);
+                    event.target.classList.add('selected-date');
+
+                    const address = event.target.dataset.address;
+                    const date = event.target.textContent;
+                    fetch(`/device_history/${address}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            const historyContainer = document.getElementById('history-gridmap');
+                            historyContainer.innerHTML = ''; // Clear previous dots
+                            data.history
+                                .filter(entry => entry.date === date)
+                                .forEach(entry => {
+                                    const dot = document.createElement('div');
+                                    dot.classList.add('history-dot');
+                                    dot.style.left = `${entry.x}px`;
+                                    dot.style.top = `${entry.y}px`;
+                                    historyContainer.appendChild(dot);
+                                });
+                        });
+                }
+            });
+
+            // Add event listener for device list items in the device history tab
+            document.getElementById('device-list').addEventListener('click', (event) => {
+                if (event.target.tagName === 'LI') {
+                    const address = event.target.dataset.address;
+                    fetch(`/device_history/${address}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            const historyList = document.getElementById('history-list');
+                            historyList.innerHTML = '';
+                            const dates = new Set(data.history.map(entry => entry.date));
+                            dates.forEach(date => {
+                                const li = document.createElement('li');
+                                li.textContent = date;
+                                li.classList.add('history-date');
+                                li.dataset.address = address;
+                                li.dataset.date = date;
+                                historyList.appendChild(li);
+                            });
+                        });
+                }
+            });
         });
 
         $(document).ready(function() {
@@ -777,11 +807,13 @@
             const coordinates = {{ address_coordinates | tojson }};
             if (coordinates[selectedMac]) {
                 const history = coordinates[selectedMac];
-                history.forEach(entry => {
-                    const li = document.createElement('li');
-                    li.textContent = `X: ${entry[0]}, Y: ${entry[1]}, Name: ${entry[2]}`;
-                    historyList.appendChild(li);
-                });
+                if (Array.isArray(history)) {
+                    history.forEach(entry => {
+                        const li = document.createElement('li');
+                        li.textContent = `X: ${entry[0]}, Y: ${entry[1]}, Name: ${entry[2]}`;
+                        historyList.appendChild(li);
+                    });
+                }
             }
         });
         // Initialize the first tab
