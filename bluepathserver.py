@@ -21,6 +21,7 @@ restrictedzones = []
 users = {}
 device_history = defaultdict(dict)  # Change to defaultdict(dict)
 last_update_time = defaultdict(lambda: datetime.min)  # Track the last update time for each address
+layout_elements = []
 
 # Load users from JSON file
 def load_users():
@@ -63,6 +64,15 @@ def load_node_positions():
     except FileNotFoundError:
         pass
 
+# Load layout elements from JSON file
+def load_layout():
+    global layout_elements
+    try:
+        with open('layout.json', 'r') as f:
+            layout_elements = json.load(f)
+    except FileNotFoundError:
+        pass
+
 # Save authorized MAC addresses to JSON file
 def save_authorized_macs():
     with open('authorized.json', 'w') as f:
@@ -83,10 +93,16 @@ def save_node_positions():
     with open('node_positions.json', 'w') as f:
         json.dump(nodepos, f)
 
+# Save layout elements to JSON file
+def save_layout():
+    with open('layout.json', 'w') as f:
+        json.dump(layout_elements, f)
+
 load_users()
 load_persistent_data()
 load_device_history()
 load_node_positions()
+load_layout()
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -234,6 +250,26 @@ def refresh_nodespos():
     except TypeError as e:
         print(f"Error emitting socket event: {e}")
     return 'Node positions refreshed', 200
+
+@app.route('/get_layout', methods=['GET'])
+def get_layout():
+    return jsonify({'layout': layout_elements}), 200
+
+@app.route('/save_layout', methods=['POST'])
+def save_layout_route():
+    global layout_elements
+    data = request.get_json()
+    layout_elements = data['layout']
+    save_layout()
+    return 'Layout saved', 200
+
+@app.route('/save_layout_element', methods=['POST'])
+def save_layout_element():
+    global layout_elements
+    data = request.get_json()
+    layout_elements.append(data)
+    save_layout()
+    return 'Layout element saved', 200
 
 def trilaterate(node_a, r1, node_b, r2, node_c, r3):
     # Calculate the coordinates of the address using trilateration

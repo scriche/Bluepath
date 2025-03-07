@@ -166,6 +166,57 @@
             border-radius: 50%;
             z-index: 20;
         }
+        .tooltip {
+            position: absolute;
+            background-color: #333;
+            color: #fff;
+            padding: 5px;
+            border-radius: 5px;
+            font-size: 12px;
+            display: none;
+            z-index: 30;
+            white-space: pre-line; /* Allow line breaks */
+        }
+        .grid-square {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            background-color: transparent;
+            z-index: 5;
+        }
+        .wall, .door {
+            position: absolute;
+            background-color: #2196F3; /* Blue for walls */
+            z-index: 5;
+        }
+        .wall {
+            width: 5px;
+            height: 25px;
+        }
+        .door {
+            width: 5px;
+            height: 25px;
+            background-color: #4CAF50; /* Green for doors */
+        }
+        .selected-device-list-item {
+            background-color: #333333;
+            color: #ffffff;
+        }
+        .heatmap-square {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            z-index: 5;
+        }
+        .heatmap-toggle-button {
+            background-color: #2196F3;
+            color: #ffffff;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
     </style>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -339,6 +390,8 @@
             let isDrawing = false;
             let startX, startY;
             let drawingEnabled = false;
+            let layoutMode = null; // 'wall' or 'door'
+            const layoutElements = []; // Store layout elements
 
             function createDraggableNode(ip, x, y) {
                 // Create image element
@@ -500,6 +553,90 @@
             container.addEventListener("click", handleClick);
             historyContainer.addEventListener("click", handleClick);
 
+            function createLayoutElement(type, x, y, orientation) {
+                const element = document.createElement('div');
+                element.classList.add(type);
+                element.style.left = `${x}px`;
+                element.style.top = `${y}px`;
+                if (orientation === 'horizontal') {
+                    element.style.width = '25px';
+                    element.style.height = '5px';
+                } else {
+                    element.style.width = '5px';
+                    element.style.height = '25px';
+                }
+                layoutElements.push({ type, x, y, orientation });
+                document.querySelectorAll('.gridmap').forEach(gridmap => gridmap.appendChild(element));
+            }
+
+            function handleLayoutClick(e) {
+                if (!layoutMode) return;
+                const rect = e.target.getBoundingClientRect();
+                const x = snapToGrid(e.clientX - rect.left);
+                const y = snapToGrid(e.clientY - rect.top);
+                const edge = getClosestEdge(e.clientX - rect.left, e.clientY - rect.top, x, y);
+                const orientation = (edge === 'top' || edge === 'bottom') ? 'horizontal' : 'vertical';
+                const adjustedX = (edge === 'left') ? x : (edge === 'right') ? x + 25 : x;
+                const adjustedY = (edge === 'top') ? y : (edge === 'bottom') ? y + 25 : y;
+                createLayoutElement(layoutMode, adjustedX, adjustedY, orientation);
+                saveLayoutElement(layoutMode, adjustedX, adjustedY, orientation);
+            }
+
+            function getClosestEdge(mouseX, mouseY, gridX, gridY) {
+                const distances = {
+                    top: Math.abs(mouseY - gridY),
+                    bottom: Math.abs(mouseY - (gridY + 25)),
+                    left: Math.abs(mouseX - gridX),
+                    right: Math.abs(mouseX - (gridX + 25))
+                };
+                return Object.keys(distances).reduce((a, b) => distances[a] < distances[b] ? a : b);
+            }
+
+            function saveLayoutElement(type, x, y, orientation) {
+                fetch('/save_layout_element', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ type, x, y, orientation })
+                });
+            }
+
+            document.querySelectorAll('.gridmap').forEach(gridmap => {
+                gridmap.addEventListener('click', handleLayoutClick);
+            });
+
+            document.getElementById('add-wall').addEventListener('click', () => {
+                layoutMode = 'wall';
+            });
+
+            document.getElementById('add-door').addEventListener('click', () => {
+                layoutMode = 'door';
+            });
+
+            // Load existing layout elements from the server
+            fetch('/get_layout')
+                .then(response => response.json())
+                .then(data => {
+                    data.layout.forEach(element => {
+                        createLayoutElement(element.type, element.x, element.y, element.orientation);
+                    });
+                });
+
+            // Save layout elements to the server
+            function saveLayout() {
+                fetch('/save_layout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ layout: layoutElements })
+                });
+            }
+
+            // Save layout on window unload
+            window.addEventListener('beforeunload', saveLayout);
+
             // Fetch initial node positions from the server
             fetch('/get_nodespos')
                 .then(response => response.json())
@@ -592,7 +729,7 @@
             });
 
             // Show the grid map tab by default
-            document.getElementById("gridmap-tab").classList.remove("hidden");
+            document.querySelector('.tabs a[href="#gridmap-tab"]').click();
 
             // Toggle selection mode for restricted zone
             $('#enable-drawing').click(function() {
@@ -640,6 +777,8 @@
                         .then(data => {
                             const historyContainer = document.getElementById('history-gridmap');
                             historyContainer.innerHTML = ''; // Clear previous dots
+                            const gridSquares = {}; // Object to store dots by grid square
+
                             data.history
                                 .filter(entry => entry.date === date)
                                 .forEach(entry => {
@@ -647,16 +786,75 @@
                                     dot.classList.add('history-dot');
                                     dot.style.left = `${entry.x}px`;
                                     dot.style.top = `${entry.y}px`;
+                                    const time = new Date(`1970-01-01T${entry.time}Z`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                                    dot.dataset.time = time; // Store the formatted time in a data attribute
                                     historyContainer.appendChild(dot);
+
+                                    // Calculate grid square coordinates
+                                    const gridX = Math.floor(entry.x / 25) * 25;
+                                    const gridY = Math.floor(entry.y / 25) * 25;
+                                    const gridKey = `${gridX},${gridY}`;
+
+                                    // Store dots by grid square
+                                    if (!gridSquares[gridKey]) {
+                                        gridSquares[gridKey] = [];
+                                    }
+                                    gridSquares[gridKey].push(time);
                                 });
+
+                            // Create grid squares
+                            for (const [key, times] of Object.entries(gridSquares)) {
+                                const [gridX, gridY] = key.split(',').map(Number);
+                                const gridSquare = document.createElement('div');
+                                gridSquare.classList.add('grid-square');
+                                gridSquare.style.left = `${gridX}px`;
+                                gridSquare.style.top = `${gridY}px`;
+                                gridSquare.dataset.times = times.join('\n'); // Store all times in a data attribute, separated by new lines
+                                historyContainer.appendChild(gridSquare);
+                            }
                         });
+                }
+            });
+
+            // Add tooltip functionality
+            const tooltip = document.createElement('div');
+            tooltip.classList.add('tooltip');
+            document.body.appendChild(tooltip);
+
+            document.getElementById('history-gridmap').addEventListener('mouseover', (event) => {
+                if (event.target.classList.contains('grid-square')) {
+                    tooltip.textContent = event.target.dataset.times;
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = `${event.pageX + 10}px`;
+                    tooltip.style.top = `${event.pageY + 10}px`;
+                }
+            });
+
+            document.getElementById('history-gridmap').addEventListener('mousemove', (event) => {
+                if (tooltip.style.display === 'block') {
+                    tooltip.style.left = `${event.pageX + 10}px`;
+                    tooltip.style.top = `${event.pageY + 10}px`;
+                }
+            });
+
+            document.getElementById('history-gridmap').addEventListener('mouseout', (event) => {
+                if (event.target.classList.contains('grid-square')) {
+                    tooltip.style.display = 'none';
                 }
             });
 
             // Add event listener for device list items in the device history tab
             document.getElementById('device-list').addEventListener('click', (event) => {
                 if (event.target.tagName === 'LI') {
+                    // Highlight the selected device
+                    document.querySelectorAll('#device-list li').forEach(device => {
+                        device.classList.remove('selected-device-list-item');
+                    });
+                    event.target.classList.add('selected-device-list-item');
+
                     const address = event.target.dataset.address;
+                    localStorage.setItem('selectedDevice', address); // Store selected device in local storage
+
                     fetch(`/device_history/${address}`)
                         .then(response => response.json())
                         .then(data => {
@@ -674,7 +872,66 @@
                         });
                 }
             });
+
+            // Highlight the selected device on page load
+            document.addEventListener('DOMContentLoaded', () => {
+                const selectedDevice = localStorage.getItem('selectedDevice');
+                if (selectedDevice) {
+                    const deviceListItem = document.querySelector(`#device-list li[data-address="${selectedDevice}"]`);
+                    if (deviceListItem) {
+                        deviceListItem.classList.add('selected-device-list-item');
+                    }
+                }
+            });
+
+            const heatmapToggleButton = document.createElement('button');
+            heatmapToggleButton.classList.add('heatmap-toggle-button');
+            heatmapToggleButton.textContent = 'Toggle Heatmap';
+            heatmapToggleButton.addEventListener('click', () => {
+                const heatmapSquares = document.querySelectorAll('.heatmap-square');
+                if (heatmapSquares.length > 0) {
+                    heatmapSquares.forEach(square => square.remove());
+                } else {
+                    generateHeatmap();
+                }
+            });
+            document.querySelector('#device-history-tab .sidebar').appendChild(heatmapToggleButton);
         });
+
+        function generateHeatmap() {
+            const historyContainer = document.getElementById('history-gridmap');
+            historyContainer.innerHTML = ''; // Clear previous heatmap
+            const gridSquares = {}; // Object to store counts by grid square
+
+            // Calculate today's date
+            const today = new Date().toISOString().split('T')[0];
+
+            // Iterate over device history to count occurrences in each grid square
+            for (const [address, history] of Object.entries(deviceHistory)) {
+                if (history[today]) {
+                    history[today].forEach(entry => {
+                        const gridX = Math.floor(entry.x / 25) * 25;
+                        const gridY = Math.floor(entry.y / 25) * 25;
+                        const gridKey = `${gridX},${gridY}`;
+                        if (!gridSquares[gridKey]) {
+                            gridSquares[gridKey] = 0;
+                        }
+                        gridSquares[gridKey]++;
+                    });
+                }
+            }
+
+            // Create heatmap squares
+            for (const [key, count] of Object.entries(gridSquares)) {
+                const [gridX, gridY] = key.split(',').map(Number);
+                const heatmapSquare = document.createElement('div');
+                heatmapSquare.classList.add('heatmap-square');
+                heatmapSquare.style.left = `${gridX}px`;
+                heatmapSquare.style.top = `${gridY}px`;
+                heatmapSquare.style.backgroundColor = `rgba(255, 0, 0, ${Math.min(count / 10, 1)})`; // Adjust color intensity based on count
+                historyContainer.appendChild(heatmapSquare);
+            }
+        }
 
         $(document).ready(function() {
             // Load restricted zones
@@ -712,9 +969,10 @@
         <div class="row">
             <div class="col s12">
                 <ul class="tabs accent-blue-bg">
-                    <li class="tab col s4"><a href="#gridmap-tab">Grid Map</a></li>
-                    <li class="tab col s4"><a href="#logs-tab">Logs</a></li>
-                    <li class="tab col s4"><a href="#device-history-tab">Device History</a></li>
+                    <li class="tab col s3"><a href="#gridmap-tab">Grid Map</a></li>
+                    <li class="tab col s3"><a href="#logs-tab">Logs</a></li>
+                    <li class="tab col s3"><a href="#device-history-tab">Device History</a></li>
+                    <li class="tab col s3"><a href="#heatmap-tab">Heatmap</a></li>
                 </ul>
             </div>
             <div id="gridmap-tab" class="col s12 tab-content hidden">
@@ -781,6 +1039,10 @@
                         <div class="legend">
                             <span>1 meter = 100px</span>
                         </div>
+                        <div class="layout-buttons">
+                            <button type="button" id="add-wall" class="layout-button wall">Add Wall</button>
+                            <button type="button" id="add-door" class="layout-button door">Add Door</button>
+                        </div>
                     </div>
                     <div class="col s4 sidebar">
                         <h5 class="accent-blue">Device List</h5>
@@ -790,16 +1052,28 @@
                     </div>
                 </div>
             </div>
+            <div id="heatmap-tab" class="col s12 tab-content hidden">
+                <div class="row">
+                    <div class="col s12">
+                        <h5 class="accent-blue">Heatmap</h5>
+                        <canvas id="heatmapCanvas" width="600" height="600" style="border:1px solid #ffffff;"></canvas>
+                        <button id="generateHeatmapButton" class="btn accent-blue-bg">Generate Heatmap</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
     <script>
         document.querySelectorAll('.tabs a').forEach(tab => {
             tab.addEventListener('click', function(event) {
                 event.preventDefault();
-                document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
-                document.querySelector(this.getAttribute('href')).style.display = 'block';
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+                document.querySelector(this.getAttribute('href')).classList.remove('hidden');
             });
         });
+        // Initialize the first tab
+        document.querySelector('.tabs a[href="#gridmap-tab"]').click();
+
         document.getElementById('mac-select').addEventListener('change', function() {
             const selectedMac = this.value;
             const historyList = document.getElementById('history-list');
@@ -818,6 +1092,38 @@
         });
         // Initialize the first tab
         document.querySelector('.tabs a').click();
+
+        document.getElementById('heatmapButton').addEventListener('click', function() {
+            fetch('/heatmap_data')
+                .then(response => response.json())
+                .then(data => {
+                    const canvas = document.getElementById('heatmapCanvas');
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    data.heatmap_data.forEach(point => {
+                        const { x, y, count } = point;
+                        const intensity = Math.min(count * 10, 255);
+                        ctx.fillStyle = `rgba(255, 0, 0, ${intensity / 255})`;
+                        ctx.fillRect(x * 10, y * 10, 10, 10);
+                    });
+                });
+        });
+
+        document.getElementById('generateHeatmapButton').addEventListener('click', function() {
+            fetch('/heatmap_data')
+                .then(response => response.json())
+                .then(data => {
+                    const canvas = document.getElementById('heatmapCanvas');
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    data.heatmap_data.forEach(point => {
+                        const { x, y, count } = point;
+                        const intensity = Math.min(count * 10, 255);
+                        ctx.fillStyle = `rgba(0, 0, 255, ${intensity / 255})`; // Blue color
+                        ctx.fillRect(x * 25, y * 25, 25, 25); // Adjust size to 25x25
+                    });
+                });
+        });
     </script>
 </body>
 </html>
