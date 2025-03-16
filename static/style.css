@@ -1,0 +1,227 @@
+body {
+    background-color: #121212;
+    color: #ffffff;
+}
+.gridmap {
+    border: 3px solid #ffffff;
+    width: 2400px; /* Increased from 1600px */
+    height: 2400px; /* Increased from 1600px */
+    box-sizing: border-box;
+    position: absolute; /* Changed from relative to absolute */
+    padding: 0; /* Removed padding */
+    margin: 0; /* Removed margin */
+    overflow: hidden; /* Add overflow hidden */
+    background-image: 
+        linear-gradient(to right, #ffffff 1px, transparent 1px), 
+        linear-gradient(to bottom, #ffffff 1px, transparent 1px),
+        linear-gradient(to right, #424242 1px, transparent 1px),
+        linear-gradient(to bottom, #424242 1px, transparent 1px);
+    background-size: 25px 25px;
+    transform-origin: 0 0; /* Add transform origin */
+    will-change: transform; /* Add will-change for better performance */
+}
+.draggable {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    cursor: grab;
+    z-index: 10;
+}
+.device {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    z-index: 5;
+}
+.node-label {
+    position: absolute;
+    font-size: 12px;
+    text-align: center;
+    transform: translateX(-50%);
+    z-index: 15;
+}
+.tabs .tab a {
+    color: #ffffff;
+}
+.tabs .tab a:hover, .tabs .tab a.active {
+    background-color: #424242;
+}
+.sidebar {
+    padding: 20px;
+    background-color: #1e1e1e;
+    border-left: 3px solid #ffffff;
+    height: 600px;
+    overflow-y: auto;
+}
+.sidebar h5 {
+    color: #ffffff;
+}
+.sidebar ul {
+    list-style-type: none;
+    padding: 0;
+}
+.sidebar ul li {
+    padding: 5px 0;
+}
+.accent-blue {
+    color: #2196F3;
+}
+.accent-blue-bg {
+    background-color: #2196F3;
+}
+.hidden {
+    display: none;
+}
+input[type="text"] {
+    color: #ffffff;
+}
+.add-button {
+    background-color: #2196F3;
+    color: #ffffff;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    text-align: center;
+    line-height: 30px;
+    cursor: pointer;
+}
+.legend {
+    margin-top: 10px;
+    text-align: center;
+}
+.delete-button {
+    color: red;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    margin-left: 10px;
+    outline: none;
+}
+.delete-button:focus {
+    outline: none;
+}
+.restrictedzone {
+    position: absolute;
+    background-color: rgba(255, 0, 0, 0.5);
+    border: 2px solid red;
+    z-index: 1;
+    width: 25px;
+    height: 25px;
+}
+.toggle-button {
+    background-color: #2196F3;
+    color: #ffffff;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    text-align: center;
+    line-height: 30px;
+    cursor: pointer;
+}
+.toggle-button.active {
+    background-color: #f44336;
+}
+.unauthorized-device {
+    border: 2px solid red;
+}
+.device-list {
+    list-style-type: none;
+    padding: 0;
+}
+.device-list li {
+    padding: 5px 0;
+    color: #ffffff;
+    cursor: pointer;
+}
+.history-list {
+    list-style-type: none;
+    padding: 0;
+    color: #ffffff;
+}
+.history-list li {
+    padding: 5px 0;
+}
+.selected-device {
+    background-color: #424242;
+    color: #ffffff;
+}
+.selected-date {
+    background-color: #333333;
+    color: #ffffff;
+}
+.history-dot {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background-color: red;
+    border-radius: 50%;
+    z-index: 20;
+}
+.tooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 1000;
+    pointer-events: none;
+    display: none;
+    white-space: pre-line;
+}
+.grid-square {
+    position: absolute;
+    width: 25px;
+    height: 25px;
+    background-color: transparent;
+    z-index: 5;
+}
+.selected-device-list-item {
+    background-color: #333333;
+    color: #ffffff;
+}
+.heatmap-square {
+    position: absolute;
+    width: 25px;
+    height: 25px;
+    z-index: 5;
+}
+.heatmap-toggle-button {
+    background-color: #2196F3;
+    color: #ffffff;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+.gridmap-container {
+    position: relative;
+    width: 600px;  /* Reduced viewport size */
+    height: 600px; /* Reduced viewport size */
+    overflow: hidden;  /* Changed from auto to hidden */
+    border: 1px solid #ccc;
+    margin: 20px 0;
+    cursor: grab;
+}
+#history-gridmap {
+    width: 2400px;
+    height: 2400px;
+    position: absolute;
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    background-image: 
+        linear-gradient(to right, #ffffff 1px, transparent 1px), 
+        linear-gradient(to bottom, #ffffff 1px, transparent 1px),
+        linear-gradient(to right, #424242 1px, transparent 1px),
+        linear-gradient(to bottom, #424242 1px, transparent 1px);
+    background-size: 25px 25px;
+    transform-origin: 0 0;
+    will-change: transform;
+    border: 3px solid #ffffff;
+}

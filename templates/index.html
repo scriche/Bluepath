@@ -6,218 +6,8 @@
     <title>Bluepath</title>
     <!-- Import Materialize CSS and JS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+    <link href="/static/style.css" rel="stylesheet"> <!-- Add reference to the new CSS file -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
-    <style>
-        body {
-            background-color: #121212;
-            color: #ffffff;
-        }
-        .gridmap {
-            border: 3px solid #ffffff;
-            width: 600px;
-            height: 600px;
-            box-sizing: border-box;
-            position: relative;
-            padding: 0;
-            background-image: 
-                linear-gradient(to right, #ffffff 1px, transparent 1px), 
-                linear-gradient(to bottom, #ffffff 1px, transparent 1px),
-                linear-gradient(to right, #424242 1px, transparent 1px),
-                linear-gradient(to bottom, #424242 1px, transparent 1px);
-            background-size: 100px 100px, 100px 100px, 25px 25px, 25px 25px;
-        }
-        .draggable {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            cursor: grab;
-            z-index: 10;
-        }
-        .device {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            z-index: 5;
-        }
-        .node-label {
-            position: absolute;
-            font-size: 12px;
-            text-align: center;
-            transform: translateX(-50%);
-            z-index: 15;
-        }
-        .tabs .tab a {
-            color: #ffffff;
-        }
-        .tabs .tab a:hover, .tabs .tab a.active {
-            background-color: #424242;
-        }
-        .sidebar {
-            padding: 20px;
-            background-color: #1e1e1e;
-            border-left: 3px solid #ffffff;
-            height: 600px;
-            overflow-y: auto;
-        }
-        .sidebar h5 {
-            color: #ffffff;
-        }
-        .sidebar ul {
-            list-style-type: none;
-            padding: 0;
-        }
-        .sidebar ul li {
-            padding: 5px 0;
-        }
-        .accent-blue {
-            color: #2196F3;
-        }
-        .accent-blue-bg {
-            background-color: #2196F3;
-        }
-        .hidden {
-            display: none;
-        }
-        input[type="text"] {
-            color: #ffffff;
-        }
-        .add-button {
-            background-color: #2196F3;
-            color: #ffffff;
-            border: none;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            text-align: center;
-            line-height: 30px;
-            cursor: pointer;
-        }
-        .legend {
-            margin-top: 10px;
-            text-align: center;
-        }
-        .delete-button {
-            color: red;
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-            margin-left: 10px;
-            outline: none;
-        }
-        .delete-button:focus {
-            outline: none;
-        }
-        .restrictedzone {
-            position: absolute;
-            background-color: rgba(255, 0, 0, 0.5);
-            border: 2px solid red;
-            z-index: 1;
-            width: 25px;
-            height: 25px;
-        }
-        .toggle-button {
-            background-color: #2196F3;
-            color: #ffffff;
-            border: none;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            text-align: center;
-            line-height: 30px;
-            cursor: pointer;
-        }
-        .toggle-button.active {
-            background-color: #f44336;
-        }
-        .unauthorized-device {
-            border: 2px solid red;
-        }
-        .device-list {
-            list-style-type: none;
-            padding: 0;
-        }
-        .device-list li {
-            padding: 5px 0;
-            color: #ffffff;
-            cursor: pointer;
-        }
-        .history-list {
-            list-style-type: none;
-            padding: 0;
-            color: #ffffff;
-        }
-        .history-list li {
-            padding: 5px 0;
-        }
-        .selected-device {
-            background-color: #424242;
-            color: #ffffff;
-        }
-        .selected-date {
-            background-color: #333333;
-            color: #ffffff;
-        }
-        .history-dot {
-            position: absolute;
-            width: 10px;
-            height: 10px;
-            background-color: red;
-            border-radius: 50%;
-            z-index: 20;
-        }
-        .tooltip {
-            position: absolute;
-            background-color: #333;
-            color: #fff;
-            padding: 5px;
-            border-radius: 5px;
-            font-size: 12px;
-            display: none;
-            z-index: 30;
-            white-space: pre-line; /* Allow line breaks */
-        }
-        .grid-square {
-            position: absolute;
-            width: 25px;
-            height: 25px;
-            background-color: transparent;
-            z-index: 5;
-        }
-        .wall, .door {
-            position: absolute;
-            background-color: #2196F3; /* Blue for walls */
-            z-index: 5;
-        }
-        .wall {
-            width: 5px;
-            height: 25px;
-        }
-        .door {
-            width: 5px;
-            height: 25px;
-            background-color: #4CAF50; /* Green for doors */
-        }
-        .selected-device-list-item {
-            background-color: #333333;
-            color: #ffffff;
-        }
-        .heatmap-square {
-            position: absolute;
-            width: 25px;
-            height: 25px;
-            z-index: 5;
-        }
-        .heatmap-toggle-button {
-            background-color: #2196F3;
-            color: #ffffff;
-            border: none;
-            border-radius: 5px;
-            padding: 10px 20px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-    </style>
     <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script>
@@ -382,25 +172,33 @@
 
         document.addEventListener("DOMContentLoaded", () => {
             const container = document.querySelector(".gridmap");
-            const historyContainer = document.querySelector("#history-gridmap");
             let nodePositions = []; // Initialize nodePositions as an empty array
             const processedIPs = new Set();
             const socket = io();
             const deviceElements = new Map(); // Map to store device elements
             let isDrawing = false;
-            let startX, startY;
             let drawingEnabled = false;
-            let layoutMode = null; // 'wall' or 'door'
-            const layoutElements = []; // Store layout elements
+
+            // Pan/zoom variables
+            let scale = 1;
+            let panX = 0;
+            let panY = 0;
+            let isPanning = false;
+            let startX, startY;
+
+            // In your DOMContentLoaded event, replace the panning initialization with:
+            setupPanZoom(document.querySelector('.gridmap-container'));
+
+            container.style.transform = `translate(${panX}px, ${panY}px)`;
 
             function createDraggableNode(ip, x, y) {
-                // Create image element
                 const img = document.createElement("img");
                 img.src = "/static/node.png";
                 img.alt = `Node ${ip}`;
                 img.classList.add("draggable");
-                img.style.left = `${x}px`;
-                img.style.top = `${y}px`;
+                img.style.left = `${x * scale + panX}px`;
+                img.style.top = `${y * scale + panY}px`;
+                // ... rest of existing code ...
 
                 // Disable default drag behavior
                 img.addEventListener("dragstart", (e) => e.preventDefault());
@@ -414,10 +212,6 @@
                     const onMouseMove = (moveEvent) => {
                         let x = moveEvent.clientX - boxRect.left - offsetX;
                         let y = moveEvent.clientY - boxRect.top - offsetY;
-
-                        // Restrict movement to the container
-                        x = Math.max(0, Math.min(container.offsetWidth - img.offsetWidth, x));
-                        y = Math.max(0, Math.min(container.offsetHeight - img.offsetHeight, y));
 
                         img.style.left = `${x}px`;
                         img.style.top = `${y}px`;
@@ -467,13 +261,12 @@
             }
 
             function createDevice(address, x, y, name = null) {
-                // Create image element
                 const img = document.createElement("img");
                 img.src = "/static/device.png";
                 img.alt = `Device ${address}`;
                 img.classList.add("device");
-                img.style.left = `${x}px`;
-                img.style.top = `${y}px`;
+                img.style.left = `${x * scale + panX}px`;
+                img.style.top = `${y * scale + panY}px`;
                 img.style.position = "absolute"; // Ensure the image is positioned absolutely
 
                 // Create label element
@@ -543,99 +336,96 @@
 
             function handleClick(e) {
                 if (!drawingEnabled) return;
+
                 const rect = container.getBoundingClientRect();
-                const x = snapToGrid(e.clientX - rect.left);
-                const y = snapToGrid(e.clientY - rect.top);
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                // Compute grid position with just panning
+                const realX = mouseX - panX;
+                const realY = mouseY - panY;
+
+                // Snap to grid
+                const x = snapToGrid(realX);
+                const y = snapToGrid(realY);
+
                 const zone = { x, y };
+                console.log('Adding restricted zone at:', zone);
                 addRestrictedZone(zone);
             }
 
             container.addEventListener("click", handleClick);
-            historyContainer.addEventListener("click", handleClick);
 
-            function createLayoutElement(type, x, y, orientation) {
-                const element = document.createElement('div');
-                element.classList.add(type);
-                element.style.left = `${x}px`;
-                element.style.top = `${y}px`;
-                if (orientation === 'horizontal') {
-                    element.style.width = '25px';
-                    element.style.height = '5px';
-                } else {
-                    element.style.width = '5px';
-                    element.style.height = '25px';
+            // Initialize pan/zoom
+            setupPanZoom(document.querySelector('.gridmap-container'));
+
+            // Enhanced Pan/Zoom Handlers
+            function setupPanZoom(mapContainer) {
+                mapContainer.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0 || drawingEnabled) return;
+                    isPanning = true;
+                    startX = e.clientX - panX;
+                    startY = e.clientY - panY;
+                    mapContainer.style.cursor = 'grabbing';
+                });
+
+                mapContainer.addEventListener('mousemove', (e) => {
+                    if (!isPanning) return;
+                    
+                    panX = e.clientX - startX;
+                    panY = e.clientY - startY;
+                    
+                    const maxX = mapContainer.offsetWidth * (scale - 1);
+                    const maxY = mapContainer.offsetHeight * (scale - 1);
+                    
+                    panX = Math.min(0, Math.max(-maxX, panX));
+                    panY = Math.min(0, Math.max(-maxY, panY));
+
+                    updateTransform();
+                });
+
+                mapContainer.addEventListener('mouseup', () => {
+                    isPanning = false;
+                    mapContainer.style.cursor = 'grab';
+                });
+
+                mapContainer.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const zoomIntensity = 0.1;
+                    const oldScale = scale;
+                    const rect = mapContainer.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+
+                    scale *= 1 + (e.deltaY > 0 ? -zoomIntensity : zoomIntensity);
+                    scale = Math.min(Math.max(1, scale), 5);
+
+                    panX = (panX - mouseX) * (scale / oldScale) + mouseX;
+                    panY = (panY - mouseY) * (scale / oldScale) + mouseY;
+
+                    updateTransform();
+                });
+
+                function updateTransform() {
+                    container.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
                 }
-                layoutElements.push({ type, x, y, orientation });
-                document.querySelectorAll('.gridmap').forEach(gridmap => gridmap.appendChild(element));
             }
 
-            function handleLayoutClick(e) {
-                if (!layoutMode) return;
-                const rect = e.target.getBoundingClientRect();
-                const x = snapToGrid(e.clientX - rect.left);
-                const y = snapToGrid(e.clientY - rect.top);
-                const edge = getClosestEdge(e.clientX - rect.left, e.clientY - rect.top, x, y);
-                const orientation = (edge === 'top' || edge === 'bottom') ? 'horizontal' : 'vertical';
-                const adjustedX = (edge === 'left') ? x : (edge === 'right') ? x + 25 : x;
-                const adjustedY = (edge === 'top') ? y : (edge === 'bottom') ? y + 25 : y;
-                createLayoutElement(layoutMode, adjustedX, adjustedY, orientation);
-                saveLayoutElement(layoutMode, adjustedX, adjustedY, orientation);
+            // Modified handleClick to account for pan/zoom
+            function handleClick(e) {
+                if (!drawingEnabled) return;
+
+                const rect = container.getBoundingClientRect();
+                const mouseX = (e.clientX - rect.left - panX) / scale;
+                const mouseY = (e.clientY - rect.top - panY) / scale;
+
+                const x = snapToGrid(mouseX);
+                const y = snapToGrid(mouseY);
+
+                const zone = { x, y };
+                console.log('Adding restricted zone at:', zone);
+                addRestrictedZone(zone);
             }
-
-            function getClosestEdge(mouseX, mouseY, gridX, gridY) {
-                const distances = {
-                    top: Math.abs(mouseY - gridY),
-                    bottom: Math.abs(mouseY - (gridY + 25)),
-                    left: Math.abs(mouseX - gridX),
-                    right: Math.abs(mouseX - (gridX + 25))
-                };
-                return Object.keys(distances).reduce((a, b) => distances[a] < distances[b] ? a : b);
-            }
-
-            function saveLayoutElement(type, x, y, orientation) {
-                fetch('/save_layout_element', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ type, x, y, orientation })
-                });
-            }
-
-            document.querySelectorAll('.gridmap').forEach(gridmap => {
-                gridmap.addEventListener('click', handleLayoutClick);
-            });
-
-            document.getElementById('add-wall').addEventListener('click', () => {
-                layoutMode = 'wall';
-            });
-
-            document.getElementById('add-door').addEventListener('click', () => {
-                layoutMode = 'door';
-            });
-
-            // Load existing layout elements from the server
-            fetch('/get_layout')
-                .then(response => response.json())
-                .then(data => {
-                    data.layout.forEach(element => {
-                        createLayoutElement(element.type, element.x, element.y, element.orientation);
-                    });
-                });
-
-            // Save layout elements to the server
-            function saveLayout() {
-                fetch('/save_layout', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ layout: layoutElements })
-                });
-            }
-
-            // Save layout on window unload
-            window.addEventListener('beforeunload', saveLayout);
 
             // Fetch initial node positions from the server
             fetch('/get_nodespos')
@@ -721,6 +511,10 @@
                 tab.addEventListener("click", (e) => {
                     e.preventDefault();
                     const target = e.target.getAttribute("href").substring(1);
+                    
+                    // Don't clear history visualization when switching tabs
+                    // Just clear when selecting a new device or date
+                    
                     document.querySelectorAll(".tab-content").forEach(content => {
                         content.classList.add("hidden");
                     });
@@ -770,14 +564,16 @@
                     });
                     event.target.classList.add('selected-date');
 
+                    // Clear previous history visualization
+                    document.querySelectorAll('.history-dot, .grid-square').forEach(el => el.remove());
+
                     const address = event.target.dataset.address;
                     const date = event.target.textContent;
                     fetch(`/device_history/${address}`)
                         .then(response => response.json())
                         .then(data => {
-                            const historyContainer = document.getElementById('history-gridmap');
-                            historyContainer.innerHTML = ''; // Clear previous dots
                             const gridSquares = {}; // Object to store dots by grid square
+                            const historyGrid = document.querySelector('#history-view');
 
                             data.history
                                 .filter(entry => entry.date === date)
@@ -787,15 +583,14 @@
                                     dot.style.left = `${entry.x}px`;
                                     dot.style.top = `${entry.y}px`;
                                     const time = new Date(`1970-01-01T${entry.time}Z`).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                                    dot.dataset.time = time; // Store the formatted time in a data attribute
-                                    historyContainer.appendChild(dot);
+                                    dot.dataset.times = time; // Change from dataset.time to dataset.times to match tooltip code
+                                    historyGrid.appendChild(dot);
 
                                     // Calculate grid square coordinates
                                     const gridX = Math.floor(entry.x / 25) * 25;
                                     const gridY = Math.floor(entry.y / 25) * 25;
                                     const gridKey = `${gridX},${gridY}`;
 
-                                    // Store dots by grid square
                                     if (!gridSquares[gridKey]) {
                                         gridSquares[gridKey] = [];
                                     }
@@ -809,8 +604,8 @@
                                 gridSquare.classList.add('grid-square');
                                 gridSquare.style.left = `${gridX}px`;
                                 gridSquare.style.top = `${gridY}px`;
-                                gridSquare.dataset.times = times.join('\n'); // Store all times in a data attribute, separated by new lines
-                                historyContainer.appendChild(gridSquare);
+                                gridSquare.dataset.times = times.join('\n');
+                                historyGrid.appendChild(gridSquare);
                             }
                         });
                 }
@@ -821,26 +616,34 @@
             tooltip.classList.add('tooltip');
             document.body.appendChild(tooltip);
 
-            document.getElementById('history-gridmap').addEventListener('mouseover', (event) => {
-                if (event.target.classList.contains('grid-square')) {
-                    tooltip.textContent = event.target.dataset.times;
-                    tooltip.style.display = 'block';
-                    tooltip.style.left = `${event.pageX + 10}px`;
-                    tooltip.style.top = `${event.pageY + 10}px`;
-                }
-            });
+            // Update these event listeners to target both gridmap and history-view
+            document.querySelectorAll('#gridmap, #history-view').forEach(container => {
+                container.addEventListener('mouseover', (event) => {
+                    const target = event.target;
+                    if (target.classList.contains('grid-square') || target.classList.contains('history-dot')) {
+                        const tooltipText = target.dataset.times;
+                        if (tooltipText) {
+                            tooltip.textContent = tooltipText;
+                            tooltip.style.display = 'block';
+                            tooltip.style.left = `${event.pageX + 10}px`;
+                            tooltip.style.top = `${event.pageY + 10}px`;
+                        }
+                    }
+                });
 
-            document.getElementById('history-gridmap').addEventListener('mousemove', (event) => {
-                if (tooltip.style.display === 'block') {
-                    tooltip.style.left = `${event.pageX + 10}px`;
-                    tooltip.style.top = `${event.pageY + 10}px`;
-                }
-            });
+                container.addEventListener('mousemove', (event) => {
+                    if (tooltip.style.display === 'block') {
+                        tooltip.style.left = `${event.pageX + 10}px`;
+                        tooltip.style.top = `${event.pageY + 10}px`;
+                    }
+                });
 
-            document.getElementById('history-gridmap').addEventListener('mouseout', (event) => {
-                if (event.target.classList.contains('grid-square')) {
-                    tooltip.style.display = 'none';
-                }
+                container.addEventListener('mouseout', (event) => {
+                    const target = event.target;
+                    if (target.classList.contains('grid-square') || target.classList.contains('history-dot')) {
+                        tooltip.style.display = 'none';
+                    }
+                });
             });
 
             // Add event listener for device list items in the device history tab
@@ -883,54 +686,80 @@
                     }
                 }
             });
-
-            const heatmapToggleButton = document.createElement('button');
-            heatmapToggleButton.classList.add('heatmap-toggle-button');
-            heatmapToggleButton.textContent = 'Toggle Heatmap';
-            heatmapToggleButton.addEventListener('click', () => {
-                const heatmapSquares = document.querySelectorAll('.heatmap-square');
-                if (heatmapSquares.length > 0) {
-                    heatmapSquares.forEach(square => square.remove());
-                } else {
-                    generateHeatmap();
-                }
-            });
-            document.querySelector('#device-history-tab .sidebar').appendChild(heatmapToggleButton);
-        });
+        }); // Close the main DOMContentLoaded event listener
 
         function generateHeatmap() {
-            const historyContainer = document.getElementById('history-gridmap');
-            historyContainer.innerHTML = ''; // Clear previous heatmap
-            const gridSquares = {}; // Object to store counts by grid square
+            // Clear any existing heatmap visualization
+            document.querySelectorAll('.heatmap-square').forEach(el => el.remove());
+            const gridSquares = {};
+            const currentTab = document.querySelector('.tab-content:not(.hidden)');
+            const gridmap = currentTab.querySelector('.gridmap');
 
-            // Calculate today's date
-            const today = new Date().toISOString().split('T')[0];
+            fetch('/device_history.json')
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.json();
+                })
+                .then(deviceHistory => {
+                    if (!deviceHistory) throw new Error('No data received');
 
-            // Iterate over device history to count occurrences in each grid square
-            for (const [address, history] of Object.entries(deviceHistory)) {
-                if (history[today]) {
-                    history[today].forEach(entry => {
-                        const gridX = Math.floor(entry.x / 25) * 25;
-                        const gridY = Math.floor(entry.y / 25) * 25;
-                        const gridKey = `${gridX},${gridY}`;
-                        if (!gridSquares[gridKey]) {
-                            gridSquares[gridKey] = 0;
-                        }
-                        gridSquares[gridKey]++;
+                    // Process initial counts
+                    Object.entries(deviceHistory).forEach(([address, dateEntries]) => {
+                        Object.entries(dateEntries).forEach(([date, entries]) => {
+                            entries.forEach(entry => {
+                                const gridX = Math.floor(entry.x / 25) * 25;
+                                const gridY = Math.floor(entry.y / 25) * 25;
+                                const gridKey = `${gridX},${gridY}`;
+                                gridSquares[gridKey] = (gridSquares[gridKey] || 0) + 1;
+                            });
+                        });
                     });
-                }
-            }
 
-            // Create heatmap squares
-            for (const [key, count] of Object.entries(gridSquares)) {
-                const [gridX, gridY] = key.split(',').map(Number);
-                const heatmapSquare = document.createElement('div');
-                heatmapSquare.classList.add('heatmap-square');
-                heatmapSquare.style.left = `${gridX}px`;
-                heatmapSquare.style.top = `${gridY}px`;
-                heatmapSquare.style.backgroundColor = `rgba(255, 0, 0, ${Math.min(count / 10, 1)})`; // Adjust color intensity based on count
-                historyContainer.appendChild(heatmapSquare);
-            }
+                    // Create spread effect
+                    const spreadIntensity = (baseX, baseY, intensity) => {
+                        const spread = [
+                            [-1, -1], [0, -1], [1, -1],
+                            [-1,  0],          [1,  0],
+                            [-1,  1], [0,  1], [1,  1]
+                        ];
+                        
+                        spread.forEach(([dx, dy]) => {
+                            const newX = baseX + (dx * 25);
+                            const newY = baseY + (dy * 25);
+                            const spreadKey = `${newX},${newY}`;
+                            const currentValue = gridSquares[spreadKey] || 0;
+                            // Add fraction of center intensity to surrounding squares
+                            gridSquares[spreadKey] = Math.max(currentValue, intensity * 0.3);
+                        });
+                    };
+
+                    // Apply spread effect to each occupied square
+                    Object.entries(gridSquares).forEach(([key, count]) => {
+                        const [baseX, baseY] = key.split(',').map(Number);
+                        spreadIntensity(baseX, baseY, count);
+                    });
+
+                    // Find the maximum count for normalization
+                    const maxCount = Math.max(...Object.values(gridSquares), 1);
+
+                    // Create heatmap squares with interpolated colors
+                    Object.entries(gridSquares).forEach(([key, count]) => {
+                        const [gridX, gridY] = key.split(',').map(Number);
+                        const heatmapSquare = document.createElement('div');
+                        heatmapSquare.classList.add('heatmap-square');
+                        heatmapSquare.style.left = `${gridX}px`;
+                        heatmapSquare.style.top = `${gridY}px`;
+                        
+                        const intensity = Math.pow(count / maxCount, 0.7); // Add exponential scaling
+                        heatmapSquare.style.backgroundColor = `rgba(255, 0, 0, ${intensity})`;
+                        heatmapSquare.dataset.count = Math.round(count);
+                        heatmapSquare.title = `Visits: ${Math.round(count)}`;
+                        gridmap.appendChild(heatmapSquare);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading device history:', error);
+                });
         }
 
         $(document).ready(function() {
@@ -960,6 +789,11 @@
                 drawingEnabled = !drawingEnabled;
                 $(this).toggleClass('active');
             });
+
+            // Add event listener for generate heatmap button
+            $('#generateHeatmapButton').click(function() {
+                generateHeatmap();
+            });
         });
     </script>
 </head>
@@ -982,7 +816,9 @@
                             <input type="checkbox" id="showBluetooth">
                             <span>Show only Bluetooth devices with a name</span>
                         </label>
-                        <div id="gridmap" class="gridmap"></div>
+                        <div class="gridmap-container">
+                            <div id="gridmap" class="gridmap"></div>
+                        </div>
                         <div class="legend">
                             <span>1 meter = 100px</span>
                         </div>
@@ -1035,13 +871,11 @@
             <div id="device-history-tab" class="col s12 tab-content hidden">
                 <div class="row">
                     <div class="col s8">
-                        <div id="history-gridmap" class="gridmap"></div>
+                        <div class="gridmap-container">
+                            <div id="history-view" class="gridmap"></div>
+                        </div>
                         <div class="legend">
                             <span>1 meter = 100px</span>
-                        </div>
-                        <div class="layout-buttons">
-                            <button type="button" id="add-wall" class="layout-button wall">Add Wall</button>
-                            <button type="button" id="add-door" class="layout-button door">Add Door</button>
                         </div>
                     </div>
                     <div class="col s4 sidebar">
@@ -1054,76 +888,21 @@
             </div>
             <div id="heatmap-tab" class="col s12 tab-content hidden">
                 <div class="row">
-                    <div class="col s12">
-                        <h5 class="accent-blue">Heatmap</h5>
-                        <canvas id="heatmapCanvas" width="600" height="600" style="border:1px solid #ffffff;"></canvas>
+                    <div class="col s8">
+                        <div class="gridmap-container">
+                            <div id="gridmap" class="gridmap"></div>
+                        </div>
+                        <div class="legend">
+                            <span>1 meter = 100px</span>
+                        </div>
+                    </div>
+                    <div class="col s4 sidebar">
+                        <h5 class="accent-blue">Heatmap Controls</h5>
                         <button id="generateHeatmapButton" class="btn accent-blue-bg">Generate Heatmap</button>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <script>
-        document.querySelectorAll('.tabs a').forEach(tab => {
-            tab.addEventListener('click', function(event) {
-                event.preventDefault();
-                document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
-                document.querySelector(this.getAttribute('href')).classList.remove('hidden');
-            });
-        });
-        // Initialize the first tab
-        document.querySelector('.tabs a[href="#gridmap-tab"]').click();
-
-        document.getElementById('mac-select').addEventListener('change', function() {
-            const selectedMac = this.value;
-            const historyList = document.getElementById('history-list');
-            historyList.innerHTML = '';
-            const coordinates = {{ address_coordinates | tojson }};
-            if (coordinates[selectedMac]) {
-                const history = coordinates[selectedMac];
-                if (Array.isArray(history)) {
-                    history.forEach(entry => {
-                        const li = document.createElement('li');
-                        li.textContent = `X: ${entry[0]}, Y: ${entry[1]}, Name: ${entry[2]}`;
-                        historyList.appendChild(li);
-                    });
-                }
-            }
-        });
-        // Initialize the first tab
-        document.querySelector('.tabs a').click();
-
-        document.getElementById('heatmapButton').addEventListener('click', function() {
-            fetch('/heatmap_data')
-                .then(response => response.json())
-                .then(data => {
-                    const canvas = document.getElementById('heatmapCanvas');
-                    const ctx = canvas.getContext('2d');
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    data.heatmap_data.forEach(point => {
-                        const { x, y, count } = point;
-                        const intensity = Math.min(count * 10, 255);
-                        ctx.fillStyle = `rgba(255, 0, 0, ${intensity / 255})`;
-                        ctx.fillRect(x * 10, y * 10, 10, 10);
-                    });
-                });
-        });
-
-        document.getElementById('generateHeatmapButton').addEventListener('click', function() {
-            fetch('/heatmap_data')
-                .then(response => response.json())
-                .then(data => {
-                    const canvas = document.getElementById('heatmapCanvas');
-                    const ctx = canvas.getContext('2d');
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    data.heatmap_data.forEach(point => {
-                        const { x, y, count } = point;
-                        const intensity = Math.min(count * 10, 255);
-                        ctx.fillStyle = `rgba(0, 0, 255, ${intensity / 255})`; // Blue color
-                        ctx.fillRect(x * 25, y * 25, 25, 25); // Adjust size to 25x25
-                    });
-                });
-        });
-    </script>
 </body>
 </html>

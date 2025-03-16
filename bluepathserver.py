@@ -145,6 +145,14 @@ def get_device_history(address):
             history_list.append({'date': date, 'time': entry['time'], 'x': entry['x'], 'y': entry['y']})
     return jsonify({'history': history_list})
 
+@app.route('/device_history.json')
+def serve_device_history():
+    try:
+        with open('device_history.json', 'r') as f:
+            return jsonify(json.load(f))
+    except FileNotFoundError:
+        return jsonify({}), 404
+
 @app.route('/update_nodespos', methods=['POST'])
 def update_nodespos():
     data = request.get_json()
@@ -372,6 +380,7 @@ def udp_server(server_ip, server_port):
 
 if __name__ == "__main__":
     server_ip = '0.0.0.0'
-    server_port = int(input("Enter the logging port: "))
+    # server_port = int(input("Enter the logging port: "))
+    server_port = 5656
     threading.Thread(target=udp_server, args=(server_ip, server_port)).start()
     socketio.run(app, host='0.0.0.0', port=8080)
