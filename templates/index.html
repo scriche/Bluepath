@@ -795,7 +795,150 @@
                 generateHeatmap();
             });
         });
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const gridmapContainer = document.querySelector('.gridmap-container');
+            const historyViewContainer = document.querySelector('#history-view');
+            const heatmapContainer = document.querySelector('#gridmap');
+
+            // Initialize pan/zoom for all relevant containers
+            setupPanZoom(gridmapContainer);
+            setupPanZoom(historyViewContainer);
+            setupPanZoom(heatmapContainer);
+
+            function setupPanZoom(container) {
+                let scale = 1;
+                let panX = 0;
+                let panY = 0;
+                let isPanning = false;
+                let startX, startY;
+
+                container.addEventListener('mousedown', (e) => {
+                    if (e.button !== 0) return; // Only handle left-click
+                    isPanning = true;
+                    startX = e.clientX - panX;
+                    startY = e.clientY - panY;
+                    container.style.cursor = 'grabbing';
+                });
+
+                container.addEventListener('mousemove', (e) => {
+                    if (!isPanning) return;
+
+                    panX = e.clientX - startX;
+                    panY = e.clientY - startY;
+
+                    const maxX = container.offsetWidth * (scale - 1);
+                    const maxY = container.offsetHeight * (scale - 1);
+
+                    panX = Math.min(0, Math.max(-maxX, panX));
+                    panY = Math.min(0, Math.max(-maxY, panY));
+
+                    updateTransform();
+                });
+
+                container.addEventListener('mouseup', () => {
+                    isPanning = false;
+                    container.style.cursor = 'grab';
+                });
+
+                container.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const zoomIntensity = 0.1;
+                    const oldScale = scale;
+                    const rect = container.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+
+                    scale *= 1 + (e.deltaY > 0 ? -zoomIntensity : zoomIntensity);
+                    scale = Math.min(Math.max(1, scale), 5);
+
+                    panX = (panX - mouseX) * (scale / oldScale) + mouseX;
+                    panY = (panY - mouseY) * (scale / oldScale) + mouseY;
+
+                    updateTransform();
+                });
+
+                function updateTransform() {
+                    const grid = container.querySelector('.gridmap');
+                    if (grid) {
+                        grid.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+                    }
+                }
+            }
+        });
     </script>
+    <script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const gridmapContainer = document.querySelector('.gridmap-container');
+        const historyViewContainer = document.querySelector('#history-view').parentElement; // Parent of history-view
+        const heatmapContainer = document.querySelector('#heatmap-tab .gridmap-container'); // Heatmap container
+
+        // Initialize pan/zoom for all relevant containers
+        setupPanZoom(gridmapContainer);
+        setupPanZoom(historyViewContainer);
+        setupPanZoom(heatmapContainer);
+
+        function setupPanZoom(container) {
+            let scale = 1;
+            let panX = 0;
+            let panY = 0;
+            let isPanning = false;
+            let startX, startY;
+
+            container.addEventListener('mousedown', (e) => {
+                if (e.button !== 0) return; // Only handle left-click
+                isPanning = true;
+                startX = e.clientX - panX;
+                startY = e.clientY - panY;
+                container.style.cursor = 'grabbing';
+            });
+
+            container.addEventListener('mousemove', (e) => {
+                if (!isPanning) return;
+
+                panX = e.clientX - startX;
+                panY = e.clientY - startY;
+
+                const maxX = container.offsetWidth * (scale - 1);
+                const maxY = container.offsetHeight * (scale - 1);
+
+                panX = Math.min(0, Math.max(-maxX, panX));
+                panY = Math.min(0, Math.max(-maxY, panY));
+
+                updateTransform();
+            });
+
+            container.addEventListener('mouseup', () => {
+                isPanning = false;
+                container.style.cursor = 'grab';
+            });
+
+            container.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const zoomIntensity = 0.1;
+                const oldScale = scale;
+                const rect = container.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                scale *= 1 + (e.deltaY > 0 ? -zoomIntensity : zoomIntensity);
+                scale = Math.min(Math.max(1, scale), 5);
+
+                panX = (panX - mouseX) * (scale / oldScale) + mouseX;
+                panY = (panY - mouseY) * (scale / oldScale) + mouseY;
+
+                updateTransform();
+            });
+
+            function updateTransform() {
+                const grid = container.querySelector('.gridmap');
+                if (grid) {
+                    grid.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+                }
+            }
+        }
+    });
+</script>
 </head>
 <body>
     <div class="container">
