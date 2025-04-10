@@ -17,7 +17,7 @@ def send_log_file(server_ip, server_port, log_file_path):
 
 def main():
     server_ip = input("Enter the server IP address: ")
-    server_port = int(input("Enter the server port: "))
+    server_port = 5656
     log_file_path = "./bluepath.log"
     print(f"Sending log file to {server_ip}:{server_port}...")
 

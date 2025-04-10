@@ -968,13 +968,15 @@
                     </div>
                     <div class="col s4 sidebar">
                         <h5 class="accent-blue">Authorized MAC Addresses</h5>
-                        <form id="add-authorized-mac-form">
-                            <input type="text" id="authorized-mac-input" placeholder="Enter MAC address" required>
+                        <form id="add-authorized-mac-form" style="display: flex; align-items: center;">
+                            <input type="text" id="authorized-mac-input" placeholder="Enter MAC address" required style="flex: 1; margin-right: 10px;">
                             <button type="submit" class="add-button">+</button>
                         </form>
                         <ul id="authorized-macs-list"></ul>
-                        <h5 class="accent-blue">Restricted Zones</h5>
-                        <button type="button" class="toggle-button" id="enable-drawing">+</button>
+                        <h5 class="accent-blue" style="display: flex; align-items: center; justify-content: space-between;">
+                            Restricted Zones
+                            <button type="button" class="toggle-button" id="enable-drawing">+</button>
+                        </h5>
                         <h5 class="accent-blue">Unauthorized Devices in Restricted Zones</h5>
                         <ul id="unauthorized-devices-list"></ul>
                     </div>
