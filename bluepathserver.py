@@ -55,14 +55,10 @@ def load_device_history():
     except FileNotFoundError:
         pass
 
-# Load node positions from JSON file
+# Load node positions
 def load_node_positions():
     global nodepos
-    try:
-        with open('node_positions.json', 'r') as f:
-            nodepos = json.load(f)
-    except FileNotFoundError:
-        pass
+    nodepos = []  # Initialize as empty
 
 # Load layout elements from JSON file
 def load_layout():
@@ -87,11 +83,6 @@ def save_restrictedzones():
 def save_device_history():
     with open('device_history.json', 'w') as f:
         json.dump(device_history, f, default=dict, indent=4)  # Add indent for better readability
-
-# Save node positions to JSON file
-def save_node_positions():
-    with open('node_positions.json', 'w') as f:
-        json.dump(nodepos, f)
 
 # Save layout elements to JSON file
 def save_layout():
@@ -159,7 +150,6 @@ def update_nodespos():
     nodepos.clear()
     for node in data:
         nodepos.append((node['ip'], node['x'], node['y']))
-    save_node_positions()
     socketio.emit('update_nodes', {'nodes': nodepos}, broadcast=True)
     return 'Node positions updated', 200
 
@@ -184,7 +174,7 @@ def receive_log():
         log_data[ip] = []
 
     log_data[ip] = log.split('\n')[:-1]
-    for i in range(len(log_data[ip])):
+    for i in range(len(log_data[ip])):  # Fix the iteration
         log_data[ip][i] = log_data[ip][i].split(',')
     calulate_position()
     restricted_devices = find_devices_in_restricted_zones()
@@ -279,33 +269,22 @@ def save_layout_element():
     save_layout()
     return 'Layout element saved', 200
 
-def trilaterate(node_a, r1, node_b, r2, node_c, r3):
-    # Calculate the coordinates of the address using trilateration
-    # r1, r2, r3 are the distances from the address to the nodes
-    # node_a, node_b, node_c are the coordinates of the nodes
-    # Multiply r1, r2, r3 by 50 to convert to grid coordinates
-    x0, y0 = node_a[1], node_a[2]
-    x1, y1 = node_b[1], node_b[2]
-    x2, y2 = node_c[1], node_c[2]
-    r1, r2, r3 = r1 * 50, r2 * 50, r3 * 50
-
-    # Convert (x0, y0), (x1, y1), and (x2, y2) into variables for solving
-    A = 2 * (x1 - x0)
-    B = 2 * (y1 - y0)
-    C = r1**2 - r2**2 - x0**2 - y0**2 + x1**2 + y1**2
-    D = 2 * (x2 - x0)
-    E = 2 * (y2 - y0)
-    F = r1**2 - r3**2 - x0**2 - y0**2 + x2**2 + y2**2
-
-    # Solve for x and y
-    denominator = A * E - B * D
-    if denominator == 0:
-        raise ValueError("The nodes are collinear; trilateration is not possible.")
-
-    x = (C * E - B * F) / denominator
-    y = (A * F - C * D) / denominator
-
-    return x, y
+def trilaterate_least_squares(nodes, distances):
+    """
+    Perform trilateration using a least-squares approach.
+    nodes: List of tuples [(x1, y1), (x2, y2), ...]
+    distances: List of distances [r1, r2, ...]
+    """
+    A = []
+    b = []
+    for i in range(len(nodes)):
+        x, y = nodes[i]
+        A.append([2 * (x - nodes[0][0]), 2 * (y - nodes[0][1])])
+        b.append(distances[0]**2 - distances[i]**2 - nodes[0][0]**2 - nodes[0][1]**2 + x**2 + y**2)
+    A = np.array(A[1:])  # Exclude the first row (reference point)
+    b = np.array(b[1:])  # Exclude the first element
+    position = np.linalg.lstsq(A, b, rcond=None)[0]
+    return position[0], position[1]
 
 def calulate_position():
     address_distance_from_node = {}
@@ -315,16 +294,24 @@ def calulate_position():
             address, rssi, name = log[2], log[3], log[1]
             if address not in address_distance_from_node:
                 address_distance_from_node[address] = []
-            address_distance_from_node[address].append((float(rssi)*-0.2 - 10))
+            address_distance_from_node[address].append((ip, float(rssi) * -0.2 - 10))
             address_names[address] = name  # Store the name associated with the address
     for address, distances in address_distance_from_node.items():
-        if len(distances) == 3 and len(nodepos) >= 3:
-            node_a = nodepos[0]
-            node_b = nodepos[1]
-            node_c = nodepos[2]
-            r1, r2, r3 = distances
+        if len(distances) >= 3 and len(nodepos) >= 3:
+            # Match nodes by their IP addresses
             try:
-                x, y = trilaterate(node_a, r1, node_b, r2, node_c, r3)
+                nodes = []
+                dist = []
+                for ip, rssi in distances:
+                    node = next(node for node in nodepos if node[0] == ip)
+                    nodes.append((node[1], node[2]))
+                    dist.append(rssi * 25)  # Convert to grid coordinates
+            except StopIteration:
+                print(f"Error: One or more nodes are missing for address {address}.")
+                continue
+
+            try:
+                x, y = trilaterate_least_squares(nodes, dist)
                 x, y = round(x), round(y)  # Round coordinates to whole numbers
                 name = address_names.get(address, address)  # Get the name or fallback to address
                 address_coordinates[address] = (x, y, name)
@@ -349,7 +336,6 @@ def find_devices_in_restricted_zones():
                 if zone['x'] < x + 20 and x < zone['x'] + 25 and zone['y'] < y + 20 and y < zone['y'] + 25:
                     restricted_devices.append(address)
                     break
-    print(restricted_devices)
     return restricted_devices
 
 @socketio.on('node_moved')
@@ -357,7 +343,6 @@ def handle_node_moved(data):
     nodepos.clear()
     for node in data['nodes']:
         nodepos.append((node['ip'], node['x'], node['y']))
-    save_node_positions()
     calulate_position()
     restricted_devices = find_devices_in_restricted_zones()
     try:
@@ -375,10 +360,12 @@ def udp_server(server_ip, server_port):
     while True:
         data, addr = sock.recvfrom(2048)
         log = data.decode().split('|')[0]
-        ip = data.decode().split('|')[1]
+        #ip = data.decode().split('|')[1]
+        ip = addr[0]
         requests.post('http://127.0.0.1:8080/logs', json={'ip': ip, 'log': log})
 
 if __name__ == "__main__":
+    load_node_positions()  # Load node positions on startup
     server_ip = '0.0.0.0'
     # server_port = int(input("Enter the logging port: "))
     server_port = 5656

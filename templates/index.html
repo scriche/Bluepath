@@ -481,20 +481,12 @@
 
             // Filter Bluetooth devices with names
             function filterBluetoothDevices(showBluetooth) {
-                document.querySelectorAll(".log-row").forEach(row => {
-                    const deviceName = row.querySelector(".device-name").textContent;
-                    if (showBluetooth && !deviceName) {
-                        row.style.display = "none";
-                    } else {
-                        row.style.display = "";
-                    }
-                });
                 document.querySelectorAll(".device").forEach(device => {
                     const deviceName = device.alt.split(' ')[1];
-                    if (showBluetooth && !deviceName) {
-                        device.style.display = "none";
+                    if (showBluetooth && (!deviceName || deviceName.trim().toLowerCase() === "unknown")) {
+                        device.style.display = "none"; // Hide the device
                     } else {
-                        device.style.display = "";
+                        device.style.display = "block"; // Show the device
                     }
                 });
             }
