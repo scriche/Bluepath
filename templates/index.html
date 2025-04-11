@@ -306,6 +306,11 @@
                 }
                 devices.forEach((device) => {
                     const { address, x, y, name } = device;
+                    // if name is Unknown do not display if (checkbox is checked)
+                    const showBluetooth = document.getElementById("showBluetooth").checked;
+                    if (showBluetooth && (!name || name.trim().toLowerCase() === "unknown")) {
+                        return; // Skip this device
+                    }
                     if (deviceElements.has(address)) {
                         // Update existing device position
                         const { img, label } = deviceElements.get(address);
@@ -971,6 +976,11 @@
                         </h5>
                         <h5 class="accent-blue">Unauthorized Devices in Restricted Zones</h5>
                         <ul id="unauthorized-devices-list"></ul>
+
+                        <div style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 10px; display: flex; justify-content: center; gap: 10px;">
+                            <button id="wallButton" class="btn accent-blue-bg">Wall</button>
+                            <button id="doorButton" class="btn green">Door</button>
+                        </div>
                     </div>
                 </div>
             </div>

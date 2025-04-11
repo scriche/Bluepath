@@ -8,6 +8,10 @@ import requests
 import numpy as np
 from flask_cors import CORS
 from datetime import datetime, timedelta
+import bcrypt
+from Cryptodome.Cipher import AES
+from Cryptodome.Util.Padding import unpad
+import base64
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -23,12 +27,16 @@ device_history = defaultdict(dict)  # Change to defaultdict(dict)
 last_update_time = defaultdict(lambda: datetime.min)  # Track the last update time for each address
 layout_elements = []
 
-# Load users from JSON file
+# AES decryption key (replace with your actual key)
+AES_KEY = b'sE5Vhr6XctXp0x1WhudWW2rU/7+htAvowjXQfT3L5cpbULgLSd/vtlqwsO5Dj7IR'
+
+# Load users from JSON file and hash passwords
 def load_users():
     global users
     try:
         with open('users.json', 'r') as f:
-            users = json.load(f)
+            raw_users = json.load(f)
+            users = {username: bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode() for username, password in raw_users.items()}
     except FileNotFoundError:
         pass
 
@@ -101,10 +109,23 @@ def login():
         data = request.get_json()
         username = data['username']
         password = data['password']
-        if username in users and users[username] == password:
+        
+        try:
+            # Open the users.json file in real-time
+            with open('users.json', 'r') as f:
+                raw_users = json.load(f)
+        except FileNotFoundError:
+            return jsonify({'success': False, 'message': 'User database not found'})
+
+        # Check if the username exists and verify the password in real-time
+        if username in raw_users and bcrypt.checkpw(password.encode(), raw_users[username].encode()):
             session['username'] = username
             return jsonify({'success': True})
-        return jsonify({'success': False})
+        
+        # If authentication fails
+        return jsonify({'success': False, 'message': 'Invalid username or password'})
+    
+    # Render the login page for GET requests
     return render_template('login.html')
 
 @app.route('/logout')
@@ -351,6 +372,17 @@ def handle_node_moved(data):
     except TypeError as e:
         print(f"Error emitting socket event: {e}")
 
+# AES-256 decryption function
+def decrypt_aes256(encrypted_data):
+    try:
+        encrypted_data = base64.b64decode(encrypted_data)
+        cipher = AES.new(AES_KEY, AES.MODE_CBC, encrypted_data[:16])  # First 16 bytes are the IV
+        decrypted_data = unpad(cipher.decrypt(encrypted_data[16:]), AES.block_size)
+        return decrypted_data.decode()
+    except Exception as e:
+        print(f"Error decrypting data: {e}")
+        return None
+
 def udp_server(server_ip, server_port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -359,15 +391,15 @@ def udp_server(server_ip, server_port):
 
     while True:
         data, addr = sock.recvfrom(2048)
-        log = data.decode().split('|')[0]
-        #ip = data.decode().split('|')[1]
+        encrypted_log = data.decode().split('|')[0]
         ip = addr[0]
-        requests.post('http://127.0.0.1:8080/logs', json={'ip': ip, 'log': log})
+        decrypted_log = decrypt_aes256(encrypted_log)
+        if decrypted_log:
+            requests.post('http://127.0.0.1:8080/logs', json={'ip': ip, 'log': decrypted_log})
 
 if __name__ == "__main__":
     load_node_positions()  # Load node positions on startup
     server_ip = '0.0.0.0'
-    # server_port = int(input("Enter the logging port: "))
     server_port = 5656
     threading.Thread(target=udp_server, args=(server_ip, server_port)).start()
-    socketio.run(app, host='0.0.0.0', port=8080)
+    socketio.run(app, host='0.0.0.0', port=8080, debug=True)
