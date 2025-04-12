@@ -9,8 +9,8 @@ import numpy as np
 from flask_cors import CORS
 from datetime import datetime, timedelta
 import bcrypt
-from Cryptodome.Cipher import AES
-from Cryptodome.Util.Padding import unpad
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import unpad
 import base64
 
 app = Flask(__name__)
@@ -28,7 +28,7 @@ last_update_time = defaultdict(lambda: datetime.min)  # Track the last update ti
 layout_elements = []
 
 # AES decryption key (replace with your actual key)
-AES_KEY = b'sE5Vhr6XctXp0x1WhudWW2rU/7+htAvowjXQfT3L5cpbULgLSd/vtlqwsO5Dj7IR'
+AES_KEY = b'Tz5SR0hrih4gVFCPILcyp+Sug9S9TS2+'
 
 # Load users from JSON file and hash passwords
 def load_users():
@@ -286,9 +286,29 @@ def save_layout_route():
 def save_layout_element():
     global layout_elements
     data = request.get_json()
-    layout_elements.append(data)
+    layout_elements.append({
+        'type': data['type'],
+        'x': data['x'],
+        'y': data['y'],
+        'side': data['side']
+    })
     save_layout()
     return 'Layout element saved', 200
+@app.route('/save_layout_element', methods=['DELETE'])
+def delete_layout_element():
+    global layout_elements
+    data = request.get_json()
+    element = {
+        'type': data['type'],
+        'x': data['x'],
+        'y': data['y'],
+        'side': data['side']
+    }
+    if element in layout_elements:
+        layout_elements.remove(element)
+        save_layout()
+        return 'Layout element deleted', 200
+    return 'Layout element not found', 404
 
 def trilaterate_least_squares(nodes, distances):
     """
@@ -378,6 +398,7 @@ def decrypt_aes256(encrypted_data):
         encrypted_data = base64.b64decode(encrypted_data)
         cipher = AES.new(AES_KEY, AES.MODE_CBC, encrypted_data[:16])  # First 16 bytes are the IV
         decrypted_data = unpad(cipher.decrypt(encrypted_data[16:]), AES.block_size)
+        print(f"Decrypted data: {decrypted_data.decode()}")
         return decrypted_data.decode()
     except Exception as e:
         print(f"Error decrypting data: {e}")
@@ -392,8 +413,10 @@ def udp_server(server_ip, server_port):
     while True:
         data, addr = sock.recvfrom(2048)
         encrypted_log = data.decode().split('|')[0]
-        ip = addr[0]
-        decrypted_log = decrypt_aes256(encrypted_log)
+        #ip = addr[0]
+        ip = data.decode().split('|')[1]
+        #decrypted_log = decrypt_aes256(encrypted_log)
+        decrypted_log = encrypted_log
         if decrypted_log:
             requests.post('http://127.0.0.1:8080/logs', json={'ip': ip, 'log': decrypted_log})
 

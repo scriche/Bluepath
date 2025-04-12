@@ -5,7 +5,7 @@ from Cryptodome.Util.Padding import pad
 import base64
 
 # AES encryption key (must match the server's key)
-AES_KEY = b'sE5Vhr6XctXp0x1WhudWW2rU/7+htAvowjXQfT3L5cpbULgLSd/vtlqwsO5Dj7IR'
+AES_KEY = b'Tz5SR0hrih4gVFCPILcyp+Sug9S9TS2+bbgqU/QXOVQ='
 
 # AES-256 encryption function
 def encrypt_aes256(data):

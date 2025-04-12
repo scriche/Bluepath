@@ -936,6 +936,152 @@
         }
     });
 </script>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        let placingWall = false;
+        let placingDoor = false;
+
+        function togglePlacementMode(mode) {
+            if ((mode === 'wall' && placingWall) || (mode === 'door' && placingDoor)) {
+                // If the button is already active, toggle it off
+                placingWall = false;
+                placingDoor = false;
+            } else {
+                placingWall = mode === 'wall';
+                placingDoor = mode === 'door';
+            }
+
+            // Update button styles for visual indication
+            const wallButton = document.getElementById('wallButton');
+            const doorButton = document.getElementById('doorButton');
+
+            if (placingWall) {
+                wallButton.classList.add('active');
+                wallButton.style.boxShadow = '0 0 10px #2196F3';
+                doorButton.classList.remove('active');
+                doorButton.style.boxShadow = 'none';
+            } else if (placingDoor) {
+                doorButton.classList.add('active');
+                doorButton.style.boxShadow = '0 0 10px #4CAF50';
+                wallButton.classList.remove('active');
+                wallButton.style.boxShadow = 'none';
+            } else {
+                wallButton.classList.remove('active');
+                wallButton.style.boxShadow = 'none';
+                doorButton.classList.remove('active');
+                doorButton.style.boxShadow = 'none';
+            }
+        }
+
+        function placeOrRemoveElement(x, y, side, type) {
+            const existingElement = document.querySelector(`.${type}[data-x="${x}"][data-y="${y}"][data-side="${side}"]`);
+            if (existingElement) {
+                // If an element already exists, remove it
+                existingElement.remove();
+                // Notify the server to remove the element
+                fetch('/save_layout_element', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ type, x, y, side })
+                });
+            } else {
+                // Otherwise, create a new element
+                const element = document.createElement('div');
+                element.classList.add(type);
+                element.style.position = 'absolute';
+                element.style.left = `${x}px`;
+                element.style.top = `${y}px`;
+                element.dataset.x = x;
+                element.dataset.y = y;
+                element.dataset.side = side;
+
+                if (side === 'top' || side === 'bottom') {
+                    element.style.width = '25px';
+                    element.style.height = '5px';
+                } else {
+                    element.style.width = '5px';
+                    element.style.height = '25px';
+                }
+
+                if (side === 'top') element.style.top = `${y - 2}px`;
+                if (side === 'bottom') element.style.top = `${y + 23}px`;
+                if (side === 'left') element.style.left = `${x - 2}px`;
+                if (side === 'right') element.style.left = `${x + 23}px`;
+
+                // Update colors to match button colors
+                element.style.backgroundColor = type === 'wall' ? '#2196F3' : '#4CAF50'; // Blue for wall, green for door
+                document.querySelector('.gridmap').appendChild(element);
+
+                // Notify the server to add the element
+                fetch('/save_layout_element', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ type, x, y, side })
+                });
+            }
+        }
+
+        function loadLayoutElements() {
+            fetch('/get_layout')
+                .then(response => response.json())
+                .then(data => {
+                    data.layout.forEach(element => {
+                        const { type, x, y, side } = element;
+                        const newElement = document.createElement('div');
+                        newElement.classList.add(type);
+                        newElement.style.position = 'absolute';
+                        newElement.style.left = `${x}px`;
+                        newElement.style.top = `${y}px`;
+                        newElement.dataset.x = x;
+                        newElement.dataset.y = y;
+                        newElement.dataset.side = side;
+
+                        if (side === 'top' || side === 'bottom') {
+                            newElement.style.width = '25px';
+                            newElement.style.height = '5px';
+                        } else {
+                            newElement.style.width = '5px';
+                            newElement.style.height = '25px';
+                        }
+
+                        if (side === 'top') newElement.style.top = `${y - 2}px`;
+                        if (side === 'bottom') newElement.style.top = `${y + 23}px`;
+                        if (side === 'left') newElement.style.left = `${x - 2}px`;
+                        if (side === 'right') newElement.style.left = `${x + 23}px`;
+
+                        newElement.style.backgroundColor = type === 'wall' ? '#2196F3' : '#4CAF50'; // Blue for wall, green for door
+                        document.querySelector('.gridmap').appendChild(newElement);
+                    });
+                });
+        }
+
+        document.getElementById('wallButton').addEventListener('click', () => togglePlacementMode('wall'));
+        document.getElementById('doorButton').addEventListener('click', () => togglePlacementMode('door'));
+
+        document.querySelector('.gridmap').addEventListener('click', (e) => {
+            if (!placingWall && !placingDoor) return;
+
+            const rect = e.target.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const x = Math.floor(mouseX / 25) * 25;
+            const y = Math.floor(mouseY / 25) * 25;
+
+            const side = mouseX % 25 < 12.5 ? (mouseY % 25 < 12.5 ? 'top' : 'left') : (mouseY % 25 < 12.5 ? 'right' : 'bottom');
+            const type = placingWall ? 'wall' : 'door';
+
+            placeOrRemoveElement(x, y, side, type);
+        });
+
+        // Load layout elements on page load
+        loadLayoutElements();
+    });
+</script>
 </head>
 <body>
     <div class="container">
