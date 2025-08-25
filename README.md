@@ -1,3 +1,14 @@
+# Bluepath
+This project aims to be a Bluetooth security and tracker system. Using the
+bluepath will be able to scan for nearby bluetooth signal regardless if they are in
+discoverable mode or not with one of the devices you can detect how many device
+are in an area and tag each devices MAC address to a specific person or device
+name allowing you to see if unauthorize devices/people are in a location. Utilizing
+multiple of these devices will allow you to additionally locate the device
+triangulating the signal strength and if they are in range of a Bluepath device. All
+of this data will be presented in a simple dashboard with a map of devices with
+their tag and location through the website interface. Placing and modifying the
+location of each device with a drag and drop configuration
 
 ## Requirements
 
